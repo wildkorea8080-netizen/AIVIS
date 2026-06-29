@@ -34,6 +34,9 @@ def _extract_types(html: str, base_url: str) -> set[str]:
 
 class SchemaCollector(BaseCollector):
     async def collect(self, ctx: AuditContext) -> SignalResult:
+        if not ctx.url:
+            return SignalResult(collector="schema", status="ok",
+                                findings=_make_findings(ctx.mode, set()))
         try:
             resp = await ctx.client.get(ctx.url, follow_redirects=True)
             resp.raise_for_status()

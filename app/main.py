@@ -64,8 +64,8 @@ async def _safe_collect(collector: BaseCollector, ctx: AuditContext) -> SignalRe
 @app.post("/audit", response_model=ReadinessReport)
 async def audit(req: AuditRequest, db: AsyncSession = Depends(get_db)) -> ReadinessReport:
     async with httpx.AsyncClient(timeout=settings.http_timeout) as client:
-        ctx = AuditContext.from_url(
-            url=str(req.url),
+        ctx = AuditContext.from_request(
+            url=str(req.url) if req.url else None,
             place_name=req.place_name,
             region=req.region,
             mode=req.mode,

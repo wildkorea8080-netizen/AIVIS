@@ -40,13 +40,15 @@ class ReadinessReport(BaseModel):
 
 
 class AuditRequest(BaseModel):
-    url: HttpUrl
+    url: HttpUrl | None = None   # LOCAL 모드에서 선택 입력
     place_name: str | None = None
     region: str | None = None
     mode: Literal["local", "brand"] = "brand"
 
     @model_validator(mode="after")
-    def local_requires_place(self) -> AuditRequest:
+    def validate_inputs(self) -> AuditRequest:
         if self.mode == "local" and not self.place_name:
             raise ValueError("mode=local 은 place_name 이 필요합니다")
+        if self.mode == "brand" and not self.url:
+            raise ValueError("mode=brand 는 url 이 필요합니다")
         return self

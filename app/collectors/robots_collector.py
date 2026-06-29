@@ -33,6 +33,11 @@ def _parse_blocked_bots(text: str) -> set[str]:
 
 class RobotsCollector(BaseCollector):
     async def collect(self, ctx: AuditContext) -> SignalResult:
+        if not ctx.origin:
+            return SignalResult(collector="robots", status="ok", findings=[
+                Finding(item_id="b_bots", label="AI 크롤러 접근", state="unknown",
+                        evidence="URL 미입력")
+            ])
         url = f"{ctx.origin}/robots.txt"
         try:
             resp = await ctx.client.get(url, follow_redirects=True)

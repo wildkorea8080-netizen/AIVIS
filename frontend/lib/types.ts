@@ -29,7 +29,7 @@ export interface ReadinessReport {
 }
 
 export interface AuditRequest {
-  url: string;
+  url?: string;           // LOCAL 모드에서 선택
   place_name?: string;
   region?: string;
   mode: Mode;

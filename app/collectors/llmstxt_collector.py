@@ -11,6 +11,11 @@ _MIN_CONTENT_LEN = 100  # 이 이상이어야 yes
 class LlmsTxtCollector(BaseCollector):
     async def collect(self, ctx: AuditContext) -> SignalResult:
         item_id = "l_llms" if ctx.mode == "local" else "b_llms"
+        if not ctx.origin:
+            return SignalResult(collector="llmstxt", status="ok", findings=[
+                Finding(item_id=item_id, label="llms.txt", state="unknown",
+                        evidence="URL 미입력")
+            ])
         url = f"{ctx.origin}/llms.txt"
 
         try:
