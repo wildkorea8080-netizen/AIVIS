@@ -14,12 +14,14 @@ _CAFE_URL = "https://openapi.naver.com/v1/search/cafearticle.json"
 
 class MentionCollector(BaseCollector):
     async def collect(self, ctx: AuditContext) -> SignalResult:
+        item_id = "l_comm" if ctx.mode == "local" else "b_comm"
+
         if not (settings.naver_client_id and settings.naver_client_secret):
             return SignalResult(
                 collector="mention",
-                status="error",
-                findings=[],
-                error="NAVER_CLIENT_ID / NAVER_CLIENT_SECRET 미설정",
+                status="ok",
+                findings=[Finding(item_id=item_id, label="커뮤니티 언급", state="unknown",
+                                  evidence="API 키 미설정 (NAVER_CLIENT_ID/SECRET)")],
             )
 
         query_parts = [ctx.place_name, ctx.region]
@@ -27,9 +29,9 @@ class MentionCollector(BaseCollector):
         if not query:
             return SignalResult(
                 collector="mention",
-                status="error",
-                findings=[],
-                error="검색어 없음 (place_name, region 모두 미입력)",
+                status="ok",
+                findings=[Finding(item_id=item_id, label="커뮤니티 언급", state="unknown",
+                                  evidence="검색어 없음")],
             )
 
         headers = {

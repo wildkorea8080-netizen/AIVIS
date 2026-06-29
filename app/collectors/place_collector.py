@@ -14,9 +14,9 @@ class PlaceCollector(BaseCollector):
         if not settings.kakao_rest_key:
             return SignalResult(
                 collector="place",
-                status="error",
-                findings=[],
-                error="KAKAO_REST_KEY 미설정",
+                status="ok",
+                findings=[Finding(item_id="l_place", label="플레이스 등록", state="unknown",
+                                  evidence="API 키 미설정 (KAKAO_REST_KEY)")],
             )
 
         if ctx.mode != "local":

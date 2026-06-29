@@ -79,7 +79,7 @@ async def audit(req: AuditRequest, db: AsyncSession = Depends(get_db)) -> Readin
     score = compute_score(req.mode, all_findings)
 
     report = ReadinessReport(
-        target_url=str(req.url),
+        target_url=str(req.url) if req.url else "",
         place_name=req.place_name,
         region=req.region,
         mode=req.mode,
@@ -93,7 +93,7 @@ async def audit(req: AuditRequest, db: AsyncSession = Depends(get_db)) -> Readin
     if db is not None:
         try:
             row = AuditReport(
-                target_url=str(req.url),
+                target_url=str(req.url) if req.url else "",
                 place_name=req.place_name,
                 region=req.region,
                 mode=req.mode,
