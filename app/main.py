@@ -18,9 +18,27 @@ from app.models.orm import AuditReport
 from app.models.schemas import AuditRequest, Finding, ReadinessReport, SignalResult
 from app.scoring.engine import compute_score
 from app.monitor.router import router as monitor_router
+from app.monitor.scheduler import start_scheduler, stop_scheduler, run_all_projects
 
 app = FastAPI(title="AIVIS", description="AEO/GEO AI 검색 노출 진단 API", version="0.1.0")
 app.include_router(monitor_router)
+
+
+@app.on_event("startup")
+async def startup() -> None:
+    start_scheduler()
+
+
+@app.on_event("shutdown")
+async def shutdown() -> None:
+    stop_scheduler()
+
+
+@app.post("/monitor/schedule/run-now", tags=["monitor"])
+async def run_schedule_now() -> dict:
+    """모든 프로젝트 즉시 실행 (관리자용)."""
+    await run_all_projects()
+    return {"status": "ok"}
 
 _COLLECTORS: list[BaseCollector] = [
     SchemaCollector(),

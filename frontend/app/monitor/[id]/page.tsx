@@ -37,7 +37,9 @@ export default async function MonitorDashboard({ params }: { params: { id: strin
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-4">
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <a href="/monitor" className="text-slate-500 hover:text-slate-300 text-sm transition-colors">← 프로젝트 목록</a>
+              <a href="/audit" className="text-slate-500 hover:text-slate-300 text-sm transition-colors">← 새 진단</a>
+              <span className="text-slate-700">·</span>
+              <a href={`/audit?url=${encodeURIComponent(project.target_url)}`} className="text-indigo-400 hover:text-indigo-300 text-sm transition-colors">재진단</a>
             </div>
             <h1 className="text-2xl font-black text-white">{project.name}</h1>
             <p className="text-slate-500 text-sm font-mono mt-0.5">{project.target_url}</p>

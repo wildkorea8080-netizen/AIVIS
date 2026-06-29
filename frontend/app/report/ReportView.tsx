@@ -3,6 +3,7 @@
 import ScoreGauge from "@/components/report/ScoreGauge";
 import FindingCard from "@/components/report/FindingCard";
 import ContactCTA from "@/components/report/ContactCTA";
+import MonitorCTA from "@/components/report/MonitorCTA";
 import type { ReadinessReport } from "@/lib/types";
 
 function scoreLabel(score: number): { text: string; color: string } {
@@ -119,14 +120,11 @@ export default function ReportView({ report, reportUrl }: Props) {
         )}
       </div>
 
-      {/* CTA */}
+      {/* 리포트 공유 */}
       <ContactCTA reportUrl={reportUrl} />
 
-      <div className="text-center">
-        <a href="/audit" className="text-indigo-400 hover:text-indigo-300 text-sm transition-colors">
-          다른 사이트 진단하기 →
-        </a>
-      </div>
+      {/* 모니터링 연결 CTA */}
+      <MonitorCTA targetUrl={target_url} placeName={place_name} mode={mode} />
     </div>
   );
 }
