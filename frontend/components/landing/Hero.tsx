@@ -1,9 +1,11 @@
 import { runAudit } from "@/app/audit/actions";
 import AuditForm from "@/components/shared/AuditForm";
 
+// 코드에서 확인 가능한 수치만 싣는다.
+// 8개 = collector 항목 수, 5개 = ai_clients.ENGINES 등록 수, 30초 = 진단 요청 타임아웃
 const STATS = [
-  { value: "62%", label: "소비자가 AI에 추천 요청" },
-  { value: "5종", label: "AI 모델 동시 진단" },
+  { value: "8개", label: "자동 점검 항목" },
+  { value: "5개", label: "추적 AI 엔진" },
   { value: "30초", label: "무료 즉시 결과" },
 ];
 
@@ -33,9 +35,9 @@ export default function Hero() {
         </h1>
 
         <p className="text-slate-400 text-lg md:text-xl leading-relaxed max-w-2xl mx-auto">
-          ChatGPT·Perplexity·Gemini·Claude가 추천하는 비즈니스가 되세요.
+          ChatGPT·Claude·Gemini·Perplexity·Grok이 추천하는 비즈니스가 되세요.
           <br />
-          URL 하나로 AI 노출 준비도를 즉시 무료 진단합니다.
+          온라인 브랜드는 URL로, 오프라인 매장은 상호와 지역만으로 진단합니다.
         </p>
 
         {/* 통계 */}

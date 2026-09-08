@@ -8,7 +8,7 @@ export default function CtaBanner() {
           지금 바로 무료로 진단받으세요
         </h2>
         <p className="text-indigo-200 text-lg">
-          30초, URL 하나면 됩니다. 신용카드 불필요.
+          30초면 끝납니다. 홈페이지가 없는 매장도 상호와 지역만으로 진단할 수 있습니다.
         </p>
         <Link
           href="/audit"
@@ -16,8 +16,8 @@ export default function CtaBanner() {
         >
           AI 노출 진단하기 →
         </Link>
-        <p className="text-indigo-400 text-sm">
-          경쟁자보다 먼저 시작하는 것이 유일한 전략입니다
+        <p className="text-indigo-300 text-sm">
+          신용카드 불필요 · 회원가입 불필요
         </p>
       </div>
     </section>

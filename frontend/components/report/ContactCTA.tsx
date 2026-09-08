@@ -16,7 +16,7 @@ export default function ContactCTA({ reportUrl }: { reportUrl: string }) {
       <div>
         <h3 className="text-white font-bold text-lg">직접 개선이 어려우신가요?</h3>
         <p className="text-slate-400 text-sm mt-1">
-          전문가에게 맡기면 평균 2~4주 내에 AI 추천 등재가 시작됩니다.
+          개선 항목을 함께 검토해 드립니다. 결과 링크는 로그인 없이 공유할 수 있습니다.
         </p>
       </div>
       <div className="flex flex-wrap gap-3">
