@@ -2,17 +2,17 @@
 
 from __future__ import annotations
 
-import asyncio
-from datetime import datetime, timezone
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from sqlalchemy import select, func
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_db
 from app.models.orm import MonitorProject, MonitorQuestion, MonitorRun
-from app.monitor.ai_clients import ENGINES, AiResponse
+from app.monitor.ai_clients import ENGINES
+from app.monitor.runner import RunSummary, execute_project
 
 router = APIRouter(prefix="/monitor", tags=["monitor"])
 
@@ -48,20 +48,6 @@ class QuestionOut(BaseModel):
     active: bool
 
     model_config = {"from_attributes": True}
-
-
-class RunResult(BaseModel):
-    ai_model: str
-    mentioned: bool
-    rank: int | None
-    snippet: str | None
-    error: str | None = None
-
-
-class RunSummary(BaseModel):
-    question_id: int
-    question: str
-    results: list[RunResult]
 
 
 class DashboardRow(BaseModel):
@@ -142,58 +128,13 @@ async def run_monitor(project_id: int, db: AsyncSession = Depends(get_db)):
     if not project:
         raise HTTPException(status_code=404, detail="프로젝트를 찾을 수 없습니다.")
 
-    result = await db.execute(
-        select(MonitorQuestion)
-        .where(MonitorQuestion.project_id == project_id, MonitorQuestion.active == True)
-    )
-    questions = result.scalars().all()
-    if not questions:
-        raise HTTPException(status_code=400, detail="활성 질문이 없습니다.")
-
-    brand = project.brand_keyword
-    summaries: list[RunSummary] = []
-
-    async def _call_one(q: MonitorQuestion, caller_fn, model_name: str) -> RunResult:
-        try:
-            resp: AiResponse = await caller_fn(q.question, brand)
-            run = MonitorRun(
-                question_id=q.id,
-                ai_model=model_name,
-                mentioned=resp.mentioned,
-                response_snippet=resp.snippet,
-                rank=resp.rank,
-            )
-            db.add(run)
-            return RunResult(
-                ai_model=model_name,
-                mentioned=resp.mentioned,
-                rank=resp.rank,
-                snippet=resp.snippet,
-            )
-        except Exception as e:
-            return RunResult(ai_model=model_name, mentioned=False, rank=None, snippet=None, error=str(e))
-
-    # 질문 × AI모델 전체 병렬 실행
-    tasks = []
-    task_meta = []
-    for q in questions:
-        for engine in ENGINES:
-            if not engine.has_key():
-                continue
-            tasks.append(_call_one(q, engine.call, engine.name))
-            task_meta.append((q.id, q.question))
-
-    raw_results = await asyncio.gather(*tasks)
-    await db.commit()
-
-    # 질문별로 묶기
-    question_map: dict[int, RunSummary] = {}
-    for (qid, qtxt), run_result in zip(task_meta, raw_results):
-        if qid not in question_map:
-            question_map[qid] = RunSummary(question_id=qid, question=qtxt, results=[])
-        question_map[qid].results.append(run_result)
-
-    return list(question_map.values())
+    summaries = await execute_project(db, project)
+    if not summaries:
+        raise HTTPException(
+            status_code=400,
+            detail="활성 질문이 없거나 사용 가능한 AI 엔진이 없습니다.",
+        )
+    return summaries
 
 
 @router.get("/projects/{project_id}/dashboard", response_model=Dashboard)

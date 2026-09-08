@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import logging
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -10,8 +9,8 @@ from apscheduler.triggers.cron import CronTrigger
 from sqlalchemy import select
 
 from app.db import AsyncSessionLocal
-from app.models.orm import MonitorProject, MonitorQuestion, MonitorRun
-from app.monitor.ai_clients import ENGINES
+from app.models.orm import MonitorProject
+from app.monitor.runner import execute_project
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +18,7 @@ scheduler = AsyncIOScheduler(timezone="Asia/Seoul")
 
 
 async def run_project(project_id: int) -> int:
-    """프로젝트의 활성 질문 전체를 AI 모델에 실행하고 결과를 저장. 실행 건수 반환."""
+    """프로젝트의 활성 질문 전체를 AI 모델에 실행하고 결과를 저장. 성공 건수 반환."""
     if AsyncSessionLocal is None:
         return 0
 
@@ -27,46 +26,9 @@ async def run_project(project_id: int) -> int:
         project = await db.get(MonitorProject, project_id)
         if not project:
             return 0
+        summaries = await execute_project(db, project)
 
-        q_result = await db.execute(
-            select(MonitorQuestion).where(
-                MonitorQuestion.project_id == project_id,
-                MonitorQuestion.active == True,
-            )
-        )
-        questions = q_result.scalars().all()
-        if not questions:
-            return 0
-
-        brand = project.brand_keyword
-        count = 0
-
-        async def _call(question: MonitorQuestion, caller_fn, model_name: str) -> None:
-            nonlocal count
-            try:
-                from app.monitor.ai_clients import AiResponse
-                resp: AiResponse = await caller_fn(question.question, brand)
-                run = MonitorRun(
-                    question_id=question.id,
-                    ai_model=model_name,
-                    mentioned=resp.mentioned,
-                    response_snippet=resp.snippet,
-                    rank=resp.rank,
-                )
-                db.add(run)
-                count += 1
-            except Exception as e:
-                logger.warning("모니터링 실행 실패 project=%d model=%s: %s", project_id, model_name, e)
-
-        tasks = [
-            _call(q, engine.call, engine.name)
-            for q in questions
-            for engine in ENGINES
-            if engine.has_key()
-        ]
-        await asyncio.gather(*tasks)
-        await db.commit()
-
+    count = sum(1 for s in summaries for r in s.results if r.error is None)
     logger.info("프로젝트 %d 모니터링 완료: %d건", project_id, count)
     return count
 
