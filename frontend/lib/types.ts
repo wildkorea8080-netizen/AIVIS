@@ -80,9 +80,20 @@ export interface DashboardRow {
   mention_rate: number;
 }
 
+export interface ModelStat {
+  ai_model: string;
+  label: string;
+  configured: boolean;      // false면 "미설정"이지 "0% 언급"이 아님
+  total_runs: number;
+  mentioned_runs: number;
+  rate: number;
+  avg_rank: number | null;
+}
+
 export interface Dashboard {
   project_id: number;
   project_name: string;
   total_mention_rate: number;
   rows: DashboardRow[];
+  by_model: ModelStat[];
 }

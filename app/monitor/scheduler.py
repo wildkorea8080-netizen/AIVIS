@@ -11,7 +11,7 @@ from sqlalchemy import select
 
 from app.db import AsyncSessionLocal
 from app.models.orm import MonitorProject, MonitorQuestion, MonitorRun
-from app.monitor.ai_clients import ALL_CALLERS
+from app.monitor.ai_clients import ENGINES
 
 logger = logging.getLogger(__name__)
 
@@ -59,10 +59,10 @@ async def run_project(project_id: int) -> int:
                 logger.warning("모니터링 실행 실패 project=%d model=%s: %s", project_id, model_name, e)
 
         tasks = [
-            _call(q, caller_fn, model_name)
+            _call(q, engine.call, engine.name)
             for q in questions
-            for model_name, caller_fn, has_key in ALL_CALLERS
-            if has_key()
+            for engine in ENGINES
+            if engine.has_key()
         ]
         await asyncio.gather(*tasks)
         await db.commit()

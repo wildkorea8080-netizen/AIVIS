@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_db
 from app.models.orm import MonitorProject, MonitorQuestion, MonitorRun
-from app.monitor.ai_clients import ALL_CALLERS, AiResponse
+from app.monitor.ai_clients import ENGINES, AiResponse
 
 router = APIRouter(prefix="/monitor", tags=["monitor"])
 
@@ -71,11 +71,22 @@ class DashboardRow(BaseModel):
     mention_rate: float          # 전체 언급률 (0.0~1.0)
 
 
+class ModelStat(BaseModel):
+    ai_model: str
+    label: str
+    configured: bool         # API 키 설정 여부 — false면 "미설정"이지 "0% 언급"이 아님
+    total_runs: int
+    mentioned_runs: int
+    rate: float              # 언급률 (0.0~1.0)
+    avg_rank: float | None   # 언급됐을 때 평균 추천 순위
+
+
 class Dashboard(BaseModel):
     project_id: int
     project_name: str
     total_mention_rate: float
     rows: list[DashboardRow]
+    by_model: list[ModelStat]
 
 
 # ── 엔드포인트 ────────────────────────────────────────────────
@@ -166,10 +177,10 @@ async def run_monitor(project_id: int, db: AsyncSession = Depends(get_db)):
     tasks = []
     task_meta = []
     for q in questions:
-        for model_name, caller_fn, has_key in ALL_CALLERS:
-            if not has_key():
+        for engine in ENGINES:
+            if not engine.has_key():
                 continue
-            tasks.append(_call_one(q, caller_fn, model_name))
+            tasks.append(_call_one(q, engine.call, engine.name))
             task_meta.append((q.id, q.question))
 
     raw_results = await asyncio.gather(*tasks)
@@ -198,21 +209,23 @@ async def get_dashboard(project_id: int, db: AsyncSession = Depends(get_db)):
     )
     questions = q_result.scalars().all()
 
+    # 프로젝트 전체 run을 한 번에 조회 (질문별 N+1 방지)
+    run_result = await db.execute(
+        select(MonitorRun)
+        .join(MonitorQuestion, MonitorRun.question_id == MonitorQuestion.id)
+        .where(MonitorQuestion.project_id == project_id)
+        .order_by(MonitorRun.ran_at.desc())
+    )
+    all_runs = run_result.scalars().all()
+
+    runs_by_question: dict[int, list[MonitorRun]] = {}
+    for r in all_runs:
+        runs_by_question.setdefault(r.question_id, []).append(r)
+
     rows: list[DashboardRow] = []
-    all_mentioned = []
-
     for q in questions:
-        run_result = await db.execute(
-            select(MonitorRun)
-            .where(MonitorRun.question_id == q.id)
-            .order_by(MonitorRun.ran_at.desc())
-        )
-        runs = run_result.scalars().all()
-
+        runs = runs_by_question.get(q.id, [])
         mentioned_count = sum(1 for r in runs if r.mentioned)
-        rate = mentioned_count / len(runs) if runs else 0.0
-        all_mentioned.extend([r.mentioned for r in runs])
-
         rows.append(DashboardRow(
             question_id=q.id,
             question=q.question,
@@ -225,14 +238,31 @@ async def get_dashboard(project_id: int, db: AsyncSession = Depends(get_db)):
                 }
                 for r in runs
             ],
-            mention_rate=rate,
+            mention_rate=mentioned_count / len(runs) if runs else 0.0,
         ))
 
-    total_rate = sum(all_mentioned) / len(all_mentioned) if all_mentioned else 0.0
+    total_rate = sum(1 for r in all_runs if r.mentioned) / len(all_runs) if all_runs else 0.0
+
+    # 엔진별 집계 — 등록된 모든 엔진을 반환해 차트 축을 고정한다
+    by_model: list[ModelStat] = []
+    for engine in ENGINES:
+        engine_runs = [r for r in all_runs if r.ai_model == engine.name]
+        mentioned = [r for r in engine_runs if r.mentioned]
+        ranks = [r.rank for r in mentioned if r.rank is not None]
+        by_model.append(ModelStat(
+            ai_model=engine.name,
+            label=engine.label,
+            configured=engine.has_key(),
+            total_runs=len(engine_runs),
+            mentioned_runs=len(mentioned),
+            rate=len(mentioned) / len(engine_runs) if engine_runs else 0.0,
+            avg_rank=round(sum(ranks) / len(ranks), 1) if ranks else None,
+        ))
 
     return Dashboard(
         project_id=project_id,
         project_name=project.name,
         total_mention_rate=total_rate,
         rows=rows,
+        by_model=by_model,
     )

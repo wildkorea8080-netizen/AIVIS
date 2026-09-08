@@ -55,12 +55,15 @@ async def test_local_no(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_no_key_error():
+async def test_no_key_reports_unknown():
+    """키가 없으면 항목을 감추지 말고 unknown으로 노출한다 (점수 분모에서만 제외)."""
     with respx.mock:
         async with httpx.AsyncClient() as client:
             result = await MentionCollector().collect(make_ctx(mode="local", client=client))
-    assert result.status == "error"
-    assert "NAVER" in result.error
+    assert result.status == "ok"
+    assert result.findings[0].item_id == "l_comm"
+    assert result.findings[0].state == "unknown"
+    assert "NAVER" in result.findings[0].evidence
 
 
 @pytest.mark.asyncio

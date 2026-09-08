@@ -5,7 +5,7 @@ import pytest
 import respx
 from fastapi.testclient import TestClient
 
-from app.main import app
+from app.main import _COLLECTORS, app
 
 client = TestClient(app)
 
@@ -27,13 +27,15 @@ async def test_brand_basic_run():
         respx.get("https://example.com").mock(return_value=httpx.Response(200, text="<html></html>"))
         respx.get("https://example.com/llms.txt").mock(return_value=httpx.Response(404))
         respx.get("https://example.com/robots.txt").mock(return_value=httpx.Response(404))
-        # NAVER, KAKAO 키 없어서 error 로 빠짐
+        respx.get("https://example.com/sitemap.xml").mock(return_value=httpx.Response(404))
+        # NAVER, KAKAO 키 없어서 unknown 으로 빠짐
         resp = client.post("/audit", json={"url": "https://example.com", "mode": "brand"})
     assert resp.status_code == 200
     data = resp.json()
     assert "score" in data
     assert 0 <= data["score"] <= 100
-    assert len(data["results"]) == 5
+    # 등록된 collector 전부가 결과를 반환해야 한다 (개수는 레지스트리를 따라감)
+    assert len(data["results"]) == len(_COLLECTORS)
 
 
 @pytest.mark.asyncio

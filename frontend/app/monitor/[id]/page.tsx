@@ -96,7 +96,7 @@ export default async function MonitorDashboard({ params }: { params: { id: strin
         {/* AI 모델별 레이더 */}
         {!needsRun && dashboard && (
           <div className="bg-slate-900 border border-slate-700 rounded-2xl p-6">
-            <ModelRadar rows={dashboard.rows} />
+            <ModelRadar stats={dashboard.by_model ?? []} />
           </div>
         )}
 
