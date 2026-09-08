@@ -9,10 +9,15 @@ from typing import Awaitable, Callable
 import httpx
 
 from app.config import settings
+from app.monitor.extraction import ParsedMention, matches_brand, parse_recommendations
 
+# 번호 목록을 요구하는 이유: 응답에서 추천 업체와 순서를 파싱하기 위함.
+# 추출 전용 LLM 호출을 한 번 더 하는 대신 기존 호출의 서식만 좁힌다(추가 비용 0).
 _SYSTEM = (
     "당신은 한국 소비자에게 비즈니스·서비스를 추천하는 AI 어시스턴트입니다. "
-    "질문에 구체적인 이름을 들어 추천해주세요."
+    "질문에 대해 구체적인 업체명을 들어 3~5곳을 추천하세요. "
+    '각 항목은 "번호. 업체명 - 간단한 이유" 형식의 번호 목록으로 작성하고, '
+    "업체명과 설명은 하이픈(-)으로 구분하세요."
 )
 _MAX_TOKENS = 800
 _TIMEOUT = 30.0
@@ -22,8 +27,10 @@ _TIMEOUT = 30.0
 class AiResponse:
     model: str
     mentioned: bool
-    rank: int | None    # 몇 번째 추천으로 언급됐는지 (1-based), 없으면 None
-    snippet: str | None # 언급된 문장 발췌
+    rank: int | None                  # 몇 번째 추천으로 언급됐는지 (1-based), 없으면 None
+    snippet: str | None               # 언급된 문장 발췌
+    text: str                         # 응답 전문 — 나중에 재추출할 수 있도록 보존
+    mentions: list[ParsedMention]     # 추천된 업체 전체 (내 브랜드 + 경쟁사)
 
 
 def _detect_mention(text: str, brand: str) -> tuple[bool, int | None, str | None]:
@@ -139,7 +146,23 @@ async def _openai_compatible(base_url: str, api_key: str, model: str, question: 
 
 def _build(model: str, text: str, brand: str) -> AiResponse:
     mentioned, rank, snippet = _detect_mention(text, brand)
-    return AiResponse(model=model, mentioned=mentioned, rank=rank, snippet=snippet)
+    mentions = parse_recommendations(text)
+
+    # 번호 목록을 파싱했다면 그쪽 순번이 정확하다.
+    # 목록 파싱에 실패한 응답(산문 등)에서는 _detect_mention의 추정치를 쓴다.
+    own = next((m for m in mentions if matches_brand(m.name_key, brand)), None)
+    if own is not None:
+        mentioned = True
+        rank = own.rank
+
+    return AiResponse(
+        model=model,
+        mentioned=mentioned,
+        rank=rank,
+        snippet=snippet,
+        text=text,
+        mentions=mentions,
+    )
 
 
 # ── 엔진 레지스트리 ───────────────────────────────────────────

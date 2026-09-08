@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections import Counter
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -10,8 +11,9 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_db
-from app.models.orm import MonitorProject, MonitorQuestion, MonitorRun
+from app.models.orm import MonitorMention, MonitorProject, MonitorQuestion, MonitorRun
 from app.monitor.ai_clients import ENGINES
+from app.monitor.extraction import matches_brand
 from app.monitor.runner import RunSummary, execute_project
 
 router = APIRouter(prefix="/monitor", tags=["monitor"])
@@ -50,11 +52,20 @@ class QuestionOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class BrandStat(BaseModel):
+    name: str                # 대표 표기 (가장 자주 쓰인 name_raw)
+    name_key: str
+    mentions: int            # 추천된 횟수
+    avg_rank: float | None   # 평균 추천 순위
+    is_own: bool             # 내 브랜드인지
+
+
 class DashboardRow(BaseModel):
     question_id: int
     question: str
     runs: list[dict]             # [{ai_model, mentioned, ran_at}, ...]
     mention_rate: float          # 전체 언급률 (0.0~1.0)
+    competitors: list[BrandStat] = []   # 이 질문에서 AI가 추천한 업체들
 
 
 class ModelStat(BaseModel):
@@ -73,6 +84,29 @@ class Dashboard(BaseModel):
     total_mention_rate: float
     rows: list[DashboardRow]
     by_model: list[ModelStat]
+    share_of_voice: list[BrandStat] = []   # 프로젝트 전체 점유율
+
+
+def _aggregate_brands(mentions: list[MonitorMention], brand_keyword: str) -> list[BrandStat]:
+    """name_key로 묶어 언급 수 내림차순으로 정렬한다."""
+    groups: dict[str, list[MonitorMention]] = {}
+    for m in mentions:
+        groups.setdefault(m.name_key, []).append(m)
+
+    stats: list[BrandStat] = []
+    for key, items in groups.items():
+        # 같은 업체라도 AI마다 표기가 흔들리므로 가장 자주 쓰인 원문을 대표로 삼는다
+        ranks = [i.rank for i in items]
+        stats.append(BrandStat(
+            name=Counter(i.name_raw for i in items).most_common(1)[0][0],
+            name_key=key,
+            mentions=len(items),
+            avg_rank=round(sum(ranks) / len(ranks), 1) if ranks else None,
+            is_own=matches_brand(key, brand_keyword),
+        ))
+
+    stats.sort(key=lambda s: (-s.mentions, s.avg_rank if s.avg_rank is not None else 99.0))
+    return stats
 
 
 # ── 엔드포인트 ────────────────────────────────────────────────
@@ -163,6 +197,20 @@ async def get_dashboard(project_id: int, db: AsyncSession = Depends(get_db)):
     for r in all_runs:
         runs_by_question.setdefault(r.question_id, []).append(r)
 
+    # 추천된 업체(내 브랜드 + 경쟁사)도 한 번에 조회
+    mention_result = await db.execute(
+        select(MonitorMention, MonitorRun.question_id)
+        .join(MonitorRun, MonitorMention.run_id == MonitorRun.id)
+        .join(MonitorQuestion, MonitorRun.question_id == MonitorQuestion.id)
+        .where(MonitorQuestion.project_id == project_id)
+    )
+    mention_rows = mention_result.all()
+    all_mentions = [m for m, _ in mention_rows]
+
+    mentions_by_question: dict[int, list[MonitorMention]] = {}
+    for m, qid in mention_rows:
+        mentions_by_question.setdefault(qid, []).append(m)
+
     rows: list[DashboardRow] = []
     for q in questions:
         runs = runs_by_question.get(q.id, [])
@@ -180,6 +228,9 @@ async def get_dashboard(project_id: int, db: AsyncSession = Depends(get_db)):
                 for r in runs
             ],
             mention_rate=mentioned_count / len(runs) if runs else 0.0,
+            competitors=_aggregate_brands(
+                mentions_by_question.get(q.id, []), project.brand_keyword
+            ),
         ))
 
     total_rate = sum(1 for r in all_runs if r.mentioned) / len(all_runs) if all_runs else 0.0
@@ -206,4 +257,5 @@ async def get_dashboard(project_id: int, db: AsyncSession = Depends(get_db)):
         total_mention_rate=total_rate,
         rows=rows,
         by_model=by_model,
+        share_of_voice=_aggregate_brands(all_mentions, project.brand_keyword),
     )

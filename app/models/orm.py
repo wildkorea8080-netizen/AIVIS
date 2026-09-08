@@ -80,9 +80,30 @@ class MonitorRun(Base):
 
     ai_model: Mapped[str] = mapped_column(String(50))       # chatgpt | claude | perplexity | gemini | grok
     mentioned: Mapped[bool] = mapped_column(Boolean)        # 브랜드 언급 여부
-    response_snippet: Mapped[str | None] = mapped_column(Text)  # 응답 일부 스냅샷
+    response_snippet: Mapped[str | None] = mapped_column(Text)  # 브랜드가 언급된 문장 발췌 (UI 표시용)
+    response_text: Mapped[str | None] = mapped_column(Text)     # 응답 전문 — 추출 로직을 고쳐도 재호출 없이 재추출 가능
     rank: Mapped[int | None] = mapped_column(Integer)       # 몇 번째로 언급됐는지
 
     ran_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, index=True)
 
     question: Mapped["MonitorQuestion"] = relationship(back_populates="runs")
+    mentions: Mapped[list["MonitorMention"]] = relationship(back_populates="run", cascade="all, delete-orphan")
+
+
+class MonitorMention(Base):
+    """한 응답에서 추천된 업체 하나. 내 브랜드와 경쟁사를 모두 담는다.
+
+    is_own은 저장하지 않는다 — project.brand_keyword가 바뀌면 과거 행이 거짓이 되므로
+    조회 시점에 name_key와 비교해 판정한다.
+    """
+
+    __tablename__ = "monitor_mentions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    run_id: Mapped[int] = mapped_column(ForeignKey("monitor_runs.id"), index=True)
+
+    name_raw: Mapped[str] = mapped_column(String(200))            # AI가 쓴 그대로 (표시용)
+    name_key: Mapped[str] = mapped_column(String(200), index=True)  # 정규화 키 (집계용)
+    rank: Mapped[int] = mapped_column(Integer)                    # 목록 내 순번 (1-based)
+
+    run: Mapped["MonitorRun"] = relationship(back_populates="mentions")
