@@ -88,7 +88,7 @@ export default async function MonitorDashboard({ params }: { params: { id: strin
                 <p className="text-slate-500 text-xs font-medium uppercase tracking-wide">모니터링 추이</p>
                 <p className="text-slate-600 text-xs">초록: 언급됨 · 회색: 미언급 · 빈칸: 미실행</p>
               </div>
-              <MentionHeatmap rows={dashboard?.rows ?? []} />
+              <MentionHeatmap rows={dashboard?.rows ?? []} engines={dashboard?.by_model ?? []} />
             </>
           )}
         </div>

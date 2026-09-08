@@ -1,15 +1,19 @@
-import type { DashboardRow } from "@/lib/types";
-
-const AI_MODELS = ["chatgpt", "claude", "perplexity", "gemini", "grok"];
-const MODEL_LABEL: Record<string, string> = {
-  chatgpt: "ChatGPT", claude: "Claude", perplexity: "Perplexity", gemini: "Gemini", grok: "Grok",
-};
+import type { DashboardRow, ModelStat } from "@/lib/types";
 
 interface Props {
   rows: DashboardRow[];
+  engines: ModelStat[];
 }
 
-export default function MentionHeatmap({ rows }: Props) {
+export default function MentionHeatmap({ rows, engines }: Props) {
+  // 실행 이력 뷰이므로 키가 등록된 엔진만 표시한다.
+  // 미설정 엔진은 레이더 차트가 별도로 안내한다.
+  const active = engines.filter((e) => e.configured);
+  const AI_MODELS = active.map((e) => e.ai_model);
+  const MODEL_LABEL: Record<string, string> = Object.fromEntries(
+    active.map((e) => [e.ai_model, e.label])
+  );
+
   if (rows.length === 0) {
     return (
       <div className="text-center py-12 text-slate-500 text-sm">
