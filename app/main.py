@@ -9,9 +9,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.collectors.base import AuditContext, BaseCollector
 from app.collectors.llmstxt_collector import LlmsTxtCollector
 from app.collectors.mention_collector import MentionCollector
+from app.collectors.meta_collector import MetaTagCollector
 from app.collectors.place_collector import PlaceCollector
+from app.collectors.rendering_collector import RenderingCollector
 from app.collectors.robots_collector import RobotsCollector
 from app.collectors.schema_collector import SchemaCollector
+from app.collectors.sitemap_collector import SitemapCollector
 from app.config import settings
 from app.db import get_db
 from app.models.orm import AuditReport
@@ -46,6 +49,9 @@ _COLLECTORS: list[BaseCollector] = [
     RobotsCollector(),
     PlaceCollector(),
     MentionCollector(),
+    MetaTagCollector(),
+    SitemapCollector(),
+    RenderingCollector(),
 ]
 
 

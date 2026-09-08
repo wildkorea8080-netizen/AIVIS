@@ -58,6 +58,43 @@ export const FINDINGS_META: Record<string, FindingMeta> = {
     title: "외부 언급·미디어",
     whyItMatters: "언론·블로그·디렉토리 언급이 AI 권위 신호가 됩니다.",
     improveTip: "언론 보도, 업종별 디렉토리 등재, 파트너십 콘텐츠를 늘리세요.",
-    weight: 18,
+    weight: 15,
+  },
+  // ── 신규 M1 항목 ──────────────────────────────────────────
+  l_meta: {
+    title: "메타태그 · 콘텐츠 구조",
+    whyItMatters: "title·description·H 태그는 AI가 페이지 주제를 이해하는 핵심 단서입니다.",
+    improveTip: "title 20-65자, description 50-160자로 작성하고 H1을 정확히 1개만 사용하세요.",
+    weight: 6,
+  },
+  b_meta: {
+    title: "메타태그 · 콘텐츠 구조",
+    whyItMatters: "title·description·H 태그 위계가 AI의 콘텐츠 이해도를 결정합니다.",
+    improveTip: "title 20-65자, description 50-160자, H1→H2→H3 위계를 지키고 이미지에 alt를 추가하세요.",
+    weight: 8,
+  },
+  l_sitemap: {
+    title: "사이트맵 (sitemap.xml)",
+    whyItMatters: "사이트맵이 있으면 AI 봇이 모든 페이지를 빠짐없이 크롤합니다.",
+    improveTip: "/sitemap.xml을 생성하고 robots.txt에 경로를 명시하세요.",
+    weight: 3,
+  },
+  b_sitemap: {
+    title: "사이트맵 (sitemap.xml)",
+    whyItMatters: "사이트맵은 AI 크롤러가 전체 콘텐츠를 색인하는 가이드입니다.",
+    improveTip: "/sitemap.xml에 주요 페이지 URL을 등록하고 정기적으로 업데이트하세요.",
+    weight: 4,
+  },
+  l_render: {
+    title: "SSR 렌더링 (GPT봇 접근)",
+    whyItMatters: "CSR(JS 렌더링) 사이트는 GPT봇이 콘텐츠를 읽지 못할 수 있습니다.",
+    improveTip: "Next.js SSR, Nuxt SSR 등 서버사이드 렌더링 방식으로 전환하세요.",
+    weight: 3,
+  },
+  b_render: {
+    title: "SSR 렌더링 (GPT봇 접근)",
+    whyItMatters: "GPT·Claude 봇은 CSR 페이지 콘텐츠를 가져가지 못해 학습에서 제외됩니다.",
+    improveTip: "Next.js App Router(SSR)를 사용하거나 정적 HTML 사전 렌더링을 적용하세요.",
+    weight: 4,
   },
 };
