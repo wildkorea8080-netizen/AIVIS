@@ -73,11 +73,20 @@ export interface DashboardRun {
   ran_at: string;
 }
 
+export interface BrandStat {
+  name: string;           // 대표 표기
+  name_key: string;
+  mentions: number;
+  avg_rank: number | null;
+  is_own: boolean;
+}
+
 export interface DashboardRow {
   question_id: number;
   question: string;
   runs: DashboardRun[];
   mention_rate: number;
+  competitors: BrandStat[];
 }
 
 export interface ModelStat {
@@ -96,4 +105,5 @@ export interface Dashboard {
   total_mention_rate: number;
   rows: DashboardRow[];
   by_model: ModelStat[];
+  share_of_voice: BrandStat[];
 }

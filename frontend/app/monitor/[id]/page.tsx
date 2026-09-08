@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { getProject, getDashboard, listQuestions } from "@/lib/monitor-api";
 import MentionHeatmap from "@/components/monitor/MentionHeatmap";
 import ModelRadar from "@/components/monitor/ModelRadar";
+import ShareOfVoice from "@/components/monitor/ShareOfVoice";
 import RunButton from "@/components/monitor/RunButton";
 import AddQuestionForm from "@/components/monitor/AddQuestionForm";
 
@@ -100,25 +101,56 @@ export default async function MonitorDashboard({ params }: { params: { id: strin
           </div>
         )}
 
+        {/* 경쟁 현황 */}
+        {!needsRun && dashboard && (
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl p-6">
+            <ShareOfVoice
+              stats={dashboard.share_of_voice ?? []}
+              brandKeyword={project.brand_keyword}
+            />
+          </div>
+        )}
+
         {/* 질문별 상세 언급률 */}
         {!needsRun && dashboard && dashboard.rows.length > 0 && (
           <div className="bg-slate-900 border border-slate-700 rounded-2xl p-6 space-y-4">
             <h3 className="text-white font-bold text-sm">질문별 언급률</h3>
             <div className="space-y-3">
               {dashboard.rows.map((row) => (
-                <div key={row.question_id} className="flex items-center gap-4">
-                  <p className="flex-1 text-slate-300 text-sm leading-snug">{row.question}</p>
-                  <div className="shrink-0 flex items-center gap-2">
-                    <div className="w-24 bg-slate-800 rounded-full h-1.5 overflow-hidden">
-                      <div
-                        className="h-full bg-green-500 rounded-full transition-all"
-                        style={{ width: `${row.mention_rate * 100}%` }}
-                      />
+                <div key={row.question_id} className="space-y-2">
+                  <div className="flex items-center gap-4">
+                    <p className="flex-1 text-slate-300 text-sm leading-snug">{row.question}</p>
+                    <div className="shrink-0 flex items-center gap-2">
+                      <div className="w-24 bg-slate-800 rounded-full h-1.5 overflow-hidden">
+                        <div
+                          className="h-full bg-green-500 rounded-full transition-all"
+                          style={{ width: `${row.mention_rate * 100}%` }}
+                        />
+                      </div>
+                      <span className={`text-sm font-bold w-8 text-right ${row.mention_rate > 0 ? "text-green-400" : "text-slate-600"}`}>
+                        {Math.round(row.mention_rate * 100)}%
+                      </span>
                     </div>
-                    <span className={`text-sm font-bold w-8 text-right ${row.mention_rate > 0 ? "text-green-400" : "text-slate-600"}`}>
-                      {Math.round(row.mention_rate * 100)}%
-                    </span>
                   </div>
+
+                  {row.competitors.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5">
+                      <span className="text-slate-600 text-xs self-center">이 질문의 추천 업체:</span>
+                      {row.competitors.slice(0, 6).map((c) => (
+                        <span
+                          key={c.name_key}
+                          title={`${c.mentions}회 추천${c.avg_rank !== null ? ` · 평균 ${c.avg_rank}위` : ""}`}
+                          className={`text-xs px-2 py-0.5 rounded-md ${
+                            c.is_own
+                              ? "bg-indigo-600/25 text-indigo-300 font-semibold"
+                              : "bg-slate-800 text-slate-400"
+                          }`}
+                        >
+                          {c.name}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
