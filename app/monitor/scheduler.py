@@ -24,7 +24,7 @@ async def run_project(project_id: int) -> int:
 
     async with AsyncSessionLocal() as db:
         project = await db.get(MonitorProject, project_id)
-        if not project:
+        if not project or project.deleted_at is not None:
             return 0
         summaries = await execute_project(db, project)
 
@@ -40,7 +40,10 @@ async def run_all_projects() -> None:
         return
 
     async with AsyncSessionLocal() as db:
-        result = await db.execute(select(MonitorProject.id))
+        # 소프트 삭제된 프로젝트는 건너뛴다 — 실행할 때마다 AI 비용이 나간다
+        result = await db.execute(
+            select(MonitorProject.id).where(MonitorProject.deleted_at.is_(None))
+        )
         project_ids = result.scalars().all()
 
     logger.info("스케줄 실행 시작: %d개 프로젝트", len(project_ids))

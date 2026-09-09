@@ -45,6 +45,13 @@ class MonitorProject(Base):
     __tablename__ = "monitor_projects"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+    # 대시보드 주소이자 접근 권한. 순번 id로 주소를 만들면 남의 프로젝트를
+    # 훑을 수 있어, AuditReport.share_id와 같은 capability URL 방식을 쓴다.
+    owner_token: Mapped[str] = mapped_column(
+        String(36), unique=True, default=lambda: str(uuid4()), index=True
+    )
+
     name: Mapped[str] = mapped_column(String(200))          # 예: "강남 이루다치과"
     target_url: Mapped[str] = mapped_column(Text)
     mode: Mapped[str] = mapped_column(String(10))           # local | brand
@@ -52,6 +59,9 @@ class MonitorProject(Base):
     owner_email: Mapped[str | None] = mapped_column(String(200))
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    # 소프트 삭제. 링크를 가진 누구나 실행 이력을 영구 파괴할 수 있으면 안 되므로
+    # 사용자 삭제는 행을 지우지 않고 이 값만 채운다.
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     questions: Mapped[list["MonitorQuestion"]] = relationship(back_populates="project", cascade="all, delete-orphan")
 
