@@ -1,22 +1,31 @@
 "use client";
 
-import { useTransition, useRef } from "react";
+import { useState, useTransition, useRef } from "react";
 import { addQuestionAction } from "@/app/monitor/actions";
 
 export default function AddQuestionForm({ projectId }: { projectId: number }) {
   const [isPending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
   const ref = useRef<HTMLFormElement>(null);
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
+    setError(null);
     startTransition(async () => {
-      await addQuestionAction(projectId, formData);
-      ref.current?.reset();
+      try {
+        await addQuestionAction(projectId, formData);
+        ref.current?.reset();
+      } catch (err: unknown) {
+        // 성공 시 redirect()가 NEXT_REDIRECT를 던지므로 오류로 취급하면 안 된다
+        if (err instanceof Error && err.message.includes("NEXT_REDIRECT")) return;
+        setError(err instanceof Error ? err.message : "질문 추가에 실패했습니다.");
+      }
     });
   }
 
   return (
+    <div className="space-y-2">
     <form ref={ref} onSubmit={handleSubmit} className="flex gap-2">
       <input
         name="question"
@@ -33,5 +42,7 @@ export default function AddQuestionForm({ projectId }: { projectId: number }) {
         {isPending ? "추가 중..." : "+ 추가"}
       </button>
     </form>
+      {error && <p className="text-red-400 text-xs">⚠️ {error}</p>}
+    </div>
   );
 }

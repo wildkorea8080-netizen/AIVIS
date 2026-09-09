@@ -52,7 +52,7 @@ export default async function MonitorDashboard({ params }: { params: { id: strin
             <h1 className="text-2xl font-black text-white">{project.name}</h1>
             <p className="text-slate-500 text-sm font-mono mt-0.5">{project.target_url}</p>
           </div>
-          <RunButton projectId={projectId} />
+          <RunButton projectId={projectId} questionCount={questions.length} />
         </div>
 
         {/* 현황 요약 카드 */}

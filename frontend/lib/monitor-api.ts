@@ -15,6 +15,15 @@ async function apiFetch(path: string, init?: RequestInit): Promise<Response> {
   });
 }
 
+/** FastAPI의 {"detail": ...}를 읽을 수 있는 문장으로 바꾼다. 원시 JSON을 화면에 띄우지 않기 위함. */
+async function readError(res: Response): Promise<string> {
+  const body = await res.json().catch(() => null);
+  const detail = body?.detail;
+  if (Array.isArray(detail)) return detail.map((d: { msg: string }) => d.msg).join(", ");
+  if (typeof detail === "string") return detail;
+  return `요청이 실패했습니다 (HTTP ${res.status})`;
+}
+
 export async function createProject(body: {
   name: string;
   target_url: string;
@@ -27,7 +36,7 @@ export async function createProject(body: {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-  if (!res.ok) throw new Error(await res.text());
+  if (!res.ok) throw new Error(await readError(res));
   return res.json();
 }
 
@@ -51,13 +60,13 @@ export async function addQuestion(projectId: number, question: string): Promise<
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ question }),
   });
-  if (!res.ok) throw new Error(await res.text());
+  if (!res.ok) throw new Error(await readError(res));
   return res.json();
 }
 
 export async function runMonitor(projectId: number): Promise<RunSummary[]> {
   const res = await apiFetch(`/monitor/projects/${projectId}/run`, { method: "POST" });
-  if (!res.ok) throw new Error(await res.text());
+  if (!res.ok) throw new Error(await readError(res));
   return res.json();
 }
 
