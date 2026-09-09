@@ -7,7 +7,7 @@ from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_db
@@ -153,6 +153,39 @@ async def list_questions(project_id: int, db: AsyncSession = Depends(get_db)):
         .where(MonitorQuestion.project_id == project_id, MonitorQuestion.active == True)
     )
     return result.scalars().all()
+
+
+@router.delete("/projects/{project_id}/questions/{question_id}", status_code=204)
+async def deactivate_question(project_id: int, question_id: int, db: AsyncSession = Depends(get_db)):
+    """질문을 목록에서 내린다.
+
+    행을 지우지 않고 active=False로 둔다. 이미 실행된 이력(run/mention)은
+    비용을 들여 얻은 데이터라 질문 하나 지운다고 함께 버릴 이유가 없다.
+    """
+    question = await db.get(MonitorQuestion, question_id)
+    if not question or question.project_id != project_id:
+        raise HTTPException(status_code=404, detail="질문을 찾을 수 없습니다.")
+    question.active = False
+    await db.commit()
+
+
+@router.delete("/projects/{project_id}", status_code=204)
+async def delete_project(project_id: int, db: AsyncSession = Depends(get_db)):
+    """프로젝트와 딸린 질문·실행이력·언급을 모두 삭제한다."""
+    project = await db.get(MonitorProject, project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="프로젝트를 찾을 수 없습니다.")
+
+    # ORM 캐스케이드는 관계를 적재해야 동작해 async에서 지연로딩 오류가 난다.
+    # 자식부터 순서대로 명시 삭제한다.
+    question_ids = select(MonitorQuestion.id).where(MonitorQuestion.project_id == project_id)
+    run_ids = select(MonitorRun.id).where(MonitorRun.question_id.in_(question_ids))
+
+    await db.execute(delete(MonitorMention).where(MonitorMention.run_id.in_(run_ids)))
+    await db.execute(delete(MonitorRun).where(MonitorRun.question_id.in_(question_ids)))
+    await db.execute(delete(MonitorQuestion).where(MonitorQuestion.project_id == project_id))
+    await db.execute(delete(MonitorProject).where(MonitorProject.id == project_id))
+    await db.commit()
 
 
 @router.post("/projects/{project_id}/run", response_model=list[RunSummary])

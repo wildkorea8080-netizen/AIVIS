@@ -5,6 +5,8 @@ import ModelRadar from "@/components/monitor/ModelRadar";
 import ShareOfVoice from "@/components/monitor/ShareOfVoice";
 import RunButton from "@/components/monitor/RunButton";
 import AddQuestionForm from "@/components/monitor/AddQuestionForm";
+import DeleteQuestionButton from "@/components/monitor/DeleteQuestionButton";
+import DeleteProjectButton from "@/components/monitor/DeleteProjectButton";
 
 function mentionLabel(rate: number) {
   if (rate >= 0.7) return { text: "매우 높음", color: "text-green-400" };
@@ -51,6 +53,9 @@ export default async function MonitorDashboard({ params }: { params: { id: strin
             </div>
             <h1 className="text-2xl font-black text-white">{project.name}</h1>
             <p className="text-slate-500 text-sm font-mono mt-0.5">{project.target_url}</p>
+            <div className="mt-2">
+              <DeleteProjectButton projectId={projectId} projectName={project.name} />
+            </div>
           </div>
           <RunButton projectId={projectId} questionCount={questions.length} />
         </div>
@@ -96,7 +101,8 @@ export default async function MonitorDashboard({ params }: { params: { id: strin
                   <span className="text-slate-600 text-xs font-mono shrink-0 mt-0.5">
                     Q{idx + 1}
                   </span>
-                  <span className="text-slate-300 text-sm leading-snug">{q.question}</span>
+                  <span className="flex-1 text-slate-300 text-sm leading-snug">{q.question}</span>
+                  <DeleteQuestionButton projectId={projectId} questionId={q.id} />
                 </li>
               ))}
             </ul>

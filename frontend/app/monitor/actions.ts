@@ -1,7 +1,13 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { createProject, addQuestion, runMonitor } from "@/lib/monitor-api";
+import {
+  createProject,
+  addQuestion,
+  runMonitor,
+  deleteQuestion,
+  deleteProject,
+} from "@/lib/monitor-api";
 
 export async function createProjectAction(formData: FormData) {
   const project = await createProject({
@@ -24,4 +30,14 @@ export async function addQuestionAction(projectId: number, formData: FormData) {
 export async function runMonitorAction(projectId: number): Promise<void> {
   await runMonitor(projectId);
   redirect(`/monitor/${projectId}`);
+}
+
+export async function deleteQuestionAction(projectId: number, questionId: number): Promise<void> {
+  await deleteQuestion(projectId, questionId);
+  redirect(`/monitor/${projectId}`);
+}
+
+export async function deleteProjectAction(projectId: number): Promise<void> {
+  await deleteProject(projectId);
+  redirect("/monitor");
 }

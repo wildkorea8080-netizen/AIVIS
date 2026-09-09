@@ -75,3 +75,17 @@ export async function getDashboard(projectId: number): Promise<Dashboard> {
   if (!res.ok) throw new Error("대시보드를 불러올 수 없습니다.");
   return res.json();
 }
+
+/** 질문을 목록에서 내린다(소프트 삭제 — 실행 이력은 보존). */
+export async function deleteQuestion(projectId: number, questionId: number): Promise<void> {
+  const res = await apiFetch(`/monitor/projects/${projectId}/questions/${questionId}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) throw new Error(await readError(res));
+}
+
+/** 프로젝트와 딸린 데이터를 모두 삭제한다. */
+export async function deleteProject(projectId: number): Promise<void> {
+  const res = await apiFetch(`/monitor/projects/${projectId}`, { method: "DELETE" });
+  if (!res.ok) throw new Error(await readError(res));
+}
