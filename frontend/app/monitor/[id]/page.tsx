@@ -85,10 +85,34 @@ export default async function MonitorDashboard({ params }: { params: { id: strin
 
           <AddQuestionForm projectId={projectId} />
 
-          {needsRun ? (
+          {/* 등록된 질문은 실행 전에도 보여준다. 개수만 바뀌면 저장이 안 된 것처럼 보인다. */}
+          {questions.length > 0 && (
+            <ul className="space-y-2">
+              {questions.map((q, idx) => (
+                <li
+                  key={q.id}
+                  className="flex items-start gap-3 bg-slate-800/50 border border-slate-700/60 rounded-xl px-4 py-3"
+                >
+                  <span className="text-slate-600 text-xs font-mono shrink-0 mt-0.5">
+                    Q{idx + 1}
+                  </span>
+                  <span className="text-slate-300 text-sm leading-snug">{q.question}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {questions.length === 0 ? (
             <div className="text-center py-10 space-y-3">
-              <p className="text-slate-400">질문을 추가하고 모니터링을 실행하면</p>
-              <p className="text-slate-400">AI가 내 브랜드를 언급하는지 추적합니다.</p>
+              <p className="text-slate-400">고객이 AI에게 물어볼 만한 질문을 추가하세요.</p>
+              <p className="text-slate-500 text-sm">예: 감성 캠핑용 우드 스툴 만드는 국내 브랜드 알려줘</p>
+            </div>
+          ) : needsRun ? (
+            <div className="text-center py-8 space-y-2">
+              <p className="text-slate-300">질문 {questions.length}개가 등록됐습니다.</p>
+              <p className="text-slate-500 text-sm">
+                위 <span className="text-indigo-400">▶ 지금 모니터링 실행</span>을 누르면 AI에 질문을 던져 추적을 시작합니다.
+              </p>
             </div>
           ) : (
             <>
