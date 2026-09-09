@@ -140,7 +140,7 @@ export default function AuditForm({ action, compact }: AuditFormProps) {
 
       {isPending && (
         <p className="text-slate-500 text-xs text-center animate-pulse">
-          AI 신호를 수집하는 중입니다... 최대 30초 소요될 수 있습니다.
+          AI 신호를 수집하는 중입니다... 첫 요청은 서버가 깨어나느라 1분까지 걸릴 수 있습니다.
         </p>
       )}
     </form>

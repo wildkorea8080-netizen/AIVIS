@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 
 import httpx
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.collectors.base import AuditContext, BaseCollector
@@ -38,8 +38,14 @@ async def shutdown() -> None:
 
 
 @app.post("/monitor/schedule/run-now", tags=["monitor"])
-async def run_schedule_now() -> dict:
-    """모든 프로젝트 즉시 실행 (관리자용)."""
+async def run_schedule_now(x_admin_token: str | None = Header(default=None)) -> dict:
+    """모든 프로젝트 즉시 실행 (관리자용).
+
+    전체 프로젝트에 대해 AI 호출을 유발하므로 공개 배포 시 반드시 보호돼야 한다.
+    ADMIN_TOKEN이 설정되지 않았으면 열지 않는다(fail closed).
+    """
+    if not settings.admin_token or x_admin_token != settings.admin_token:
+        raise HTTPException(status_code=403, detail="관리자 토큰이 필요합니다.")
     await run_all_projects()
     return {"status": "ok"}
 

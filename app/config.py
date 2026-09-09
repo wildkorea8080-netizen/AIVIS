@@ -20,6 +20,9 @@ class Settings(BaseSettings):
 
     http_timeout: float = 8.0
 
+    # 관리자 전용 엔드포인트 보호. 미설정이면 해당 엔드포인트는 닫힌다.
+    admin_token: str = ""
+
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 

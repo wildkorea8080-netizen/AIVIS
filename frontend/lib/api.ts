@@ -7,7 +7,9 @@ export async function submitAudit(req: AuditRequest): Promise<ReadinessReport> {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(req),
-    signal: AbortSignal.timeout(30_000),
+    // 워밍 상태에서는 10초 안팎이면 끝난다. 여유를 둔 이유는 무료 호스팅의
+    // 콜드 스타트(유휴 후 첫 요청)가 30초를 넘길 수 있기 때문이다.
+    signal: AbortSignal.timeout(60_000),
     cache: "no-store",
   });
   if (!res.ok) {
