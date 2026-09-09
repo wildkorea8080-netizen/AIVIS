@@ -18,12 +18,19 @@ export default async function MonitorDashboard({ params }: { params: { id: strin
   const projectId = parseInt(params.id);
   if (isNaN(projectId)) return notFound();
 
-  const [project, dashboard, questions] = await Promise.all([
-    getProject(projectId).catch(() => null),
+  // 서버에 닿지 못한 경우와 프로젝트가 없는 경우를 구분한다.
+  // 둘을 뭉뚱그리면 백엔드가 잠들었을 뿐인데 "없는 프로젝트"라고 알리게 된다.
+  const [projectResult, dashboard, questions] = await Promise.all([
+    getProject(projectId).then(
+      (project) => ({ reachable: true as const, project }),
+      () => ({ reachable: false as const, project: null }),
+    ),
     getDashboard(projectId).catch(() => null),
     listQuestions(projectId).catch(() => []),
   ]);
 
+  if (!projectResult.reachable) return <ServerUnreachable />;
+  const project = projectResult.project;
   if (!project) return notFound();
 
   const label = mentionLabel(dashboard?.total_mention_rate ?? 0);
@@ -160,6 +167,24 @@ export default async function MonitorDashboard({ params }: { params: { id: strin
     </div>
   );
 }
+
+function ServerUnreachable() {
+  return (
+    <div className="min-h-screen bg-slate-950 pt-32 px-4">
+      <div className="max-w-md mx-auto text-center space-y-4">
+        <h1 className="text-xl font-bold text-white">서버를 깨우는 중입니다</h1>
+        <p className="text-slate-400 text-sm leading-relaxed">
+          한동안 사용이 없으면 서버가 절전 상태로 들어갑니다. 깨어나는 데 1분 정도
+          걸릴 수 있으니 잠시 후 새로고침해 주세요.
+        </p>
+        <p className="text-slate-600 text-xs">
+          계속 같은 화면이 보이면 서버가 내려간 상태일 수 있습니다.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 
 function SummaryCard({
   label, value, valueColor, sub,

@@ -7,7 +7,11 @@ const API_BASE = process.env.API_URL ?? "http://localhost:8000";
 
 async function fetchReport(shareId: string): Promise<ReadinessReport | null> {
   try {
-    const res = await fetch(`${API_BASE}/report/${shareId}`, { cache: "no-store" });
+    // 타임아웃이 없으면 잠든 서버를 기다리다 플랫폼이 함수를 죽여 500이 뜬다
+    const res = await fetch(`${API_BASE}/report/${shareId}`, {
+      cache: "no-store",
+      signal: AbortSignal.timeout(50_000),
+    });
     if (!res.ok) return null;
     return res.json();
   } catch {
