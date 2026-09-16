@@ -1,0 +1,37 @@
+name: 일일 모니터링 실행
+
+# Render 무료 인스턴스는 15분 유휴 후 잠들어 APScheduler가 돌지 않는다.
+# 외부에서 깨우면서 호출해야 매일 실행이 실제로 일어난다.
+on:
+  schedule:
+    - cron: "0 0 * * *" # 00:00 UTC = 09:00 KST
+  workflow_dispatch: # 수동 실행 허용
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 서버 깨우기
+        # 잠든 인스턴스는 첫 요청에 30~50초가 걸린다. 깨어날 때까지 기다린 뒤
+        # 본 호출을 해야 타임아웃으로 헛돌지 않는다.
+        run: |
+          for i in $(seq 1 20); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 60 "${{ secrets.AIVIS_API_URL }}/health" || echo 000)
+            echo "시도 $i: HTTP $code"
+            [ "$code" = "200" ] && exit 0
+            sleep 15
+          done
+          echo "서버가 깨어나지 않았습니다"
+          exit 1
+
+      - name: 모니터링 실행
+        run: |
+          body=$(mktemp)
+          code=$(curl -s -X POST --max-time 600 \
+            -H "X-Admin-Token: ${{ secrets.ADMIN_TOKEN }}" \
+            -o "$body" -w '%{http_code}' \
+            "${{ secrets.AIVIS_API_URL }}/monitor/schedule/run-now")
+          echo "HTTP $code"
+          cat "$body"
+          # 로그가 곧 실행 이력이다. 실패하면 job을 빨갛게 만들어 알아챌 수 있게 한다.
+          [ "$code" = "200" ]
