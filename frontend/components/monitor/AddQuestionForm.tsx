@@ -3,7 +3,7 @@
 import { useState, useTransition, useRef } from "react";
 import { addQuestionAction } from "@/app/monitor/actions";
 
-export default function AddQuestionForm({ projectId }: { projectId: number }) {
+export default function AddQuestionForm({ token }: { token: string }) {
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const ref = useRef<HTMLFormElement>(null);
@@ -14,7 +14,7 @@ export default function AddQuestionForm({ projectId }: { projectId: number }) {
     setError(null);
     startTransition(async () => {
       try {
-        await addQuestionAction(projectId, formData);
+        await addQuestionAction(token, formData);
         ref.current?.reset();
       } catch (err: unknown) {
         // 성공 시 redirect()가 NEXT_REDIRECT를 던지므로 오류로 취급하면 안 된다

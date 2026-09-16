@@ -33,9 +33,10 @@ function improveTips(findings: ReadinessReport["findings"]): string[] {
 interface Props {
   report: ReadinessReport;
   reportUrl: string;
+  hasProjects?: boolean;
 }
 
-export default function ReportView({ report, reportUrl }: Props) {
+export default function ReportView({ report, reportUrl, hasProjects }: Props) {
   const { target_url, place_name, mode, score, findings, generated_at } = report;
   const date = new Date(generated_at).toLocaleString("ko-KR");
   const sl = scoreLabel(score);
@@ -124,7 +125,7 @@ export default function ReportView({ report, reportUrl }: Props) {
       <ContactCTA reportUrl={reportUrl} />
 
       {/* 모니터링 연결 CTA */}
-      <MonitorCTA targetUrl={target_url} placeName={place_name} mode={mode} />
+      <MonitorCTA targetUrl={target_url} placeName={place_name} mode={mode} hasProjects={hasProjects} />
     </div>
   );
 }

@@ -2,9 +2,10 @@ interface Props {
   targetUrl: string;
   placeName?: string | null;
   mode: "local" | "brand";
+  hasProjects?: boolean;
 }
 
-export default function MonitorCTA({ targetUrl, placeName, mode }: Props) {
+export default function MonitorCTA({ targetUrl, placeName, mode, hasProjects = false }: Props) {
   const params = new URLSearchParams({
     url: targetUrl,
     ...(placeName ? { keyword: placeName } : {}),
@@ -31,11 +32,12 @@ export default function MonitorCTA({ targetUrl, placeName, mode }: Props) {
         >
           모니터링 시작하기 →
         </a>
+        {/* 이미 프로젝트가 있으면 목록으로 보낸다. 누를 때마다 새 프로젝트가 생기면 중복이 쌓인다. */}
         <a
-          href="/audit"
+          href={hasProjects ? "/monitor" : "/audit"}
           className="flex-1 text-center bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium rounded-xl py-3 px-4 text-sm transition-all"
         >
-          다른 사이트 진단하기
+          {hasProjects ? "내 프로젝트 보기" : "다른 사이트 진단하기"}
         </a>
       </div>
 

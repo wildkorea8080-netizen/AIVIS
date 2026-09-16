@@ -8,6 +8,7 @@ import {
   deleteQuestion,
   deleteProject,
 } from "@/lib/monitor-api";
+import { rememberProjectToken } from "@/lib/project-cookie";
 
 export async function createProjectAction(formData: FormData) {
   const project = await createProject({
@@ -17,27 +18,32 @@ export async function createProjectAction(formData: FormData) {
     brand_keyword: formData.get("brand_keyword") as string,
     owner_email: (formData.get("owner_email") as string) || undefined,
   });
-  redirect(`/monitor/${project.id}`);
+
+  // 계정이 없으므로 이 쿠키가 프로젝트로 돌아올 유일한 길이다.
+  // redirect()보다 먼저 기록해야 응답에 Set-Cookie가 실린다.
+  rememberProjectToken(project.owner_token);
+
+  redirect(`/monitor/${project.owner_token}`);
 }
 
-export async function addQuestionAction(projectId: number, formData: FormData) {
+export async function addQuestionAction(token: string, formData: FormData) {
   const question = formData.get("question") as string;
   if (!question?.trim()) return;
-  await addQuestion(projectId, question.trim());
-  redirect(`/monitor/${projectId}`);
+  await addQuestion(token, question.trim());
+  redirect(`/monitor/${token}`);
 }
 
-export async function runMonitorAction(projectId: number): Promise<void> {
-  await runMonitor(projectId);
-  redirect(`/monitor/${projectId}`);
+export async function runMonitorAction(token: string): Promise<void> {
+  await runMonitor(token);
+  redirect(`/monitor/${token}`);
 }
 
-export async function deleteQuestionAction(projectId: number, questionId: number): Promise<void> {
-  await deleteQuestion(projectId, questionId);
-  redirect(`/monitor/${projectId}`);
+export async function deleteQuestionAction(token: string, questionId: number): Promise<void> {
+  await deleteQuestion(token, questionId);
+  redirect(`/monitor/${token}`);
 }
 
-export async function deleteProjectAction(projectId: number): Promise<void> {
-  await deleteProject(projectId);
+export async function deleteProjectAction(token: string): Promise<void> {
+  await deleteProject(token);
   redirect("/monitor");
 }

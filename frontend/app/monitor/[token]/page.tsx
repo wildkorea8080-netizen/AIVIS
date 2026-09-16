@@ -16,19 +16,18 @@ function mentionLabel(rate: number) {
   return { text: "없음", color: "text-slate-500" };
 }
 
-export default async function MonitorDashboard({ params }: { params: { id: string } }) {
-  const projectId = parseInt(params.id);
-  if (isNaN(projectId)) return notFound();
+export default async function MonitorDashboard({ params }: { params: { token: string } }) {
+  const token = params.token;
 
   // 서버에 닿지 못한 경우와 프로젝트가 없는 경우를 구분한다.
   // 둘을 뭉뚱그리면 백엔드가 잠들었을 뿐인데 "없는 프로젝트"라고 알리게 된다.
   const [projectResult, dashboard, questions] = await Promise.all([
-    getProject(projectId).then(
+    getProject(token).then(
       (project) => ({ reachable: true as const, project }),
       () => ({ reachable: false as const, project: null }),
     ),
-    getDashboard(projectId).catch(() => null),
-    listQuestions(projectId).catch(() => []),
+    getDashboard(token).catch(() => null),
+    listQuestions(token).catch(() => []),
   ]);
 
   if (!projectResult.reachable) return <ServerUnreachable />;
@@ -54,10 +53,10 @@ export default async function MonitorDashboard({ params }: { params: { id: strin
             <h1 className="text-2xl font-black text-white">{project.name}</h1>
             <p className="text-slate-500 text-sm font-mono mt-0.5">{project.target_url}</p>
             <div className="mt-2">
-              <DeleteProjectButton projectId={projectId} projectName={project.name} />
+              <DeleteProjectButton token={token} projectName={project.name} />
             </div>
           </div>
-          <RunButton projectId={projectId} questionCount={questions.length} />
+          <RunButton token={token} questionCount={questions.length} />
         </div>
 
         {/* 현황 요약 카드 */}
@@ -88,7 +87,7 @@ export default async function MonitorDashboard({ params }: { params: { id: strin
             <h2 className="text-white font-bold">모니터링 질문 목록 <span className="text-slate-500 font-normal text-sm">{questions.length}개</span></h2>
           </div>
 
-          <AddQuestionForm projectId={projectId} />
+          <AddQuestionForm token={token} />
 
           {/* 등록된 질문은 실행 전에도 보여준다. 개수만 바뀌면 저장이 안 된 것처럼 보인다. */}
           {questions.length > 0 && (
@@ -102,7 +101,7 @@ export default async function MonitorDashboard({ params }: { params: { id: strin
                     Q{idx + 1}
                   </span>
                   <span className="flex-1 text-slate-300 text-sm leading-snug">{q.question}</span>
-                  <DeleteQuestionButton projectId={projectId} questionId={q.id} />
+                  <DeleteQuestionButton token={token} questionId={q.id} />
                 </li>
               ))}
             </ul>

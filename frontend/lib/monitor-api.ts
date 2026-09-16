@@ -1,4 +1,10 @@
-import type { Dashboard, MonitorProject, MonitorQuestion, RunSummary } from "./types";
+import type {
+  Dashboard,
+  MonitorProject,
+  MonitorQuestion,
+  ProjectSummary,
+  RunSummary,
+} from "./types";
 
 const API_BASE = process.env.API_URL ?? "http://localhost:8000";
 
@@ -40,22 +46,34 @@ export async function createProject(body: {
   return res.json();
 }
 
+/** 토큰 여러 개를 한 번에 조회. 모르는 토큰은 서버가 조용히 생략한다. */
+export async function lookupProjects(tokens: string[]): Promise<ProjectSummary[]> {
+  if (tokens.length === 0) return [];
+  const res = await apiFetch("/monitor/projects/batch", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ tokens }),
+  });
+  if (!res.ok) return [];
+  return res.json();
+}
+
 /** 프로젝트가 없으면 null. 서버에 닿지 못하면 예외를 던진다(호출부가 구분해 처리). */
-export async function getProject(id: number): Promise<MonitorProject | null> {
-  const res = await apiFetch(`/monitor/projects/${id}`);
+export async function getProject(token: string): Promise<MonitorProject | null> {
+  const res = await apiFetch(`/monitor/p/${token}`);
   if (res.status === 404) return null;
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
 }
 
-export async function listQuestions(projectId: number): Promise<MonitorQuestion[]> {
-  const res = await apiFetch(`/monitor/projects/${projectId}/questions`);
+export async function listQuestions(token: string): Promise<MonitorQuestion[]> {
+  const res = await apiFetch(`/monitor/p/${token}/questions`);
   if (!res.ok) return [];
   return res.json();
 }
 
-export async function addQuestion(projectId: number, question: string): Promise<MonitorQuestion> {
-  const res = await apiFetch(`/monitor/projects/${projectId}/questions`, {
+export async function addQuestion(token: string, question: string): Promise<MonitorQuestion> {
+  const res = await apiFetch(`/monitor/p/${token}/questions`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ question }),
@@ -64,28 +82,28 @@ export async function addQuestion(projectId: number, question: string): Promise<
   return res.json();
 }
 
-export async function runMonitor(projectId: number): Promise<RunSummary[]> {
-  const res = await apiFetch(`/monitor/projects/${projectId}/run`, { method: "POST" });
+export async function runMonitor(token: string): Promise<RunSummary[]> {
+  const res = await apiFetch(`/monitor/p/${token}/run`, { method: "POST" });
   if (!res.ok) throw new Error(await readError(res));
   return res.json();
 }
 
-export async function getDashboard(projectId: number): Promise<Dashboard> {
-  const res = await apiFetch(`/monitor/projects/${projectId}/dashboard`);
+export async function getDashboard(token: string): Promise<Dashboard> {
+  const res = await apiFetch(`/monitor/p/${token}/dashboard`);
   if (!res.ok) throw new Error("대시보드를 불러올 수 없습니다.");
   return res.json();
 }
 
 /** 질문을 목록에서 내린다(소프트 삭제 — 실행 이력은 보존). */
-export async function deleteQuestion(projectId: number, questionId: number): Promise<void> {
-  const res = await apiFetch(`/monitor/projects/${projectId}/questions/${questionId}`, {
+export async function deleteQuestion(token: string, questionId: number): Promise<void> {
+  const res = await apiFetch(`/monitor/p/${token}/questions/${questionId}`, {
     method: "DELETE",
   });
   if (!res.ok) throw new Error(await readError(res));
 }
 
-/** 프로젝트와 딸린 데이터를 모두 삭제한다. */
-export async function deleteProject(projectId: number): Promise<void> {
-  const res = await apiFetch(`/monitor/projects/${projectId}`, { method: "DELETE" });
+/** 프로젝트를 목록에서 내린다(소프트 삭제). */
+export async function deleteProject(token: string): Promise<void> {
+  const res = await apiFetch(`/monitor/p/${token}`, { method: "DELETE" });
   if (!res.ok) throw new Error(await readError(res));
 }

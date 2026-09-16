@@ -39,11 +39,24 @@ export interface AuditRequest {
 
 export interface MonitorProject {
   id: number;
+  owner_token: string;      // 대시보드 주소이자 접근 권한
   name: string;
   target_url: string;
   mode: Mode;
   brand_keyword: string;
   created_at: string;
+}
+
+/** 목록 화면용 요약 (POST /monitor/projects/batch 응답) */
+export interface ProjectSummary {
+  owner_token: string;
+  name: string;
+  target_url: string;
+  mode: Mode;
+  brand_keyword: string;
+  created_at: string;
+  question_count: number;
+  last_run_at: string | null;
 }
 
 export interface MonitorQuestion {

@@ -4,11 +4,11 @@ import { useState, useTransition } from "react";
 import { runMonitorAction } from "@/app/monitor/actions";
 
 interface Props {
-  projectId: number;
+  token: string;
   questionCount: number;
 }
 
-export default function RunButton({ projectId, questionCount }: Props) {
+export default function RunButton({ token, questionCount }: Props) {
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
@@ -19,7 +19,7 @@ export default function RunButton({ projectId, questionCount }: Props) {
     setError(null);
     startTransition(async () => {
       try {
-        await runMonitorAction(projectId);
+        await runMonitorAction(token);
       } catch (err: unknown) {
         // 성공 시 redirect()가 NEXT_REDIRECT를 던지므로 오류로 취급하면 안 된다
         if (err instanceof Error && err.message.includes("NEXT_REDIRECT")) return;

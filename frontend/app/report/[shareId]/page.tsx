@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import type { ReadinessReport } from "@/lib/types";
 import ReportView from "@/app/report/ReportView";
+import { readProjectTokens } from "@/lib/project-cookie";
 
 const API_BASE = process.env.API_URL ?? "http://localhost:8000";
 
@@ -28,7 +29,7 @@ export default async function SharedReportPage({ params }: { params: { shareId: 
   return (
     <div className="min-h-screen bg-slate-950 pt-20 pb-16 px-4">
       <Suspense>
-        <ReportView report={report} reportUrl={shareUrl} />
+        <ReportView report={report} reportUrl={shareUrl} hasProjects={readProjectTokens().length > 0} />
       </Suspense>
     </div>
   );

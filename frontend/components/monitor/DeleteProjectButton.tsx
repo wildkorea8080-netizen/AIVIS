@@ -4,10 +4,10 @@ import { useState, useTransition } from "react";
 import { deleteProjectAction } from "@/app/monitor/actions";
 
 export default function DeleteProjectButton({
-  projectId,
+  token,
   projectName,
 }: {
-  projectId: number;
+  token: string;
   projectName: string;
 }) {
   const [isPending, startTransition] = useTransition();
@@ -18,7 +18,7 @@ export default function DeleteProjectButton({
     setError(null);
     startTransition(async () => {
       try {
-        await deleteProjectAction(projectId);
+        await deleteProjectAction(token);
       } catch (err: unknown) {
         if (err instanceof Error && err.message.includes("NEXT_REDIRECT")) return;
         setError(err instanceof Error ? err.message : "삭제에 실패했습니다.");
