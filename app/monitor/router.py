@@ -1,10 +1,8 @@
 """Monitor 모듈 FastAPI 라우터.
 
-접근 방식이 두 가지 공존한다:
-  - /monitor/projects/{id}  : 정수 id. 열거가 가능해 폐기 예정이며, 프론트 전환이
-                              끝나면 제거한다. 소유 토큰은 절대 반환하지 않는다.
-  - /monitor/p/{token}      : capability URL. 앞으로의 정식 경로.
-라우팅만 다르고 실제 동작은 아래 공용 함수 한 벌을 공유한다.
+프로젝트는 /monitor/p/{token} 으로만 접근한다. 순번 id로 주소를 만들면 남의
+프로젝트를 훑을 수 있어, AuditReport.share_id와 같은 capability URL을 쓴다.
+행을 실제로 지우는 경로는 ADMIN_TOKEN 뒤에만 둔다.
 """
 
 from __future__ import annotations
@@ -12,11 +10,12 @@ from __future__ import annotations
 from collections import Counter
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel, Field
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import settings
 from app.db import get_db
 from app.models.orm import MonitorMention, MonitorProject, MonitorQuestion, MonitorRun
 from app.monitor.ai_clients import ENGINES
@@ -448,40 +447,34 @@ async def dashboard_by_token(token: str, db: AsyncSession = Depends(get_db)):
     return await _dashboard(db, await _by_token(db, token))
 
 
-# ── 정수 id 경로 (폐기 예정) ───────────────────────────────────
-# 프론트가 토큰 경로로 넘어가면 이 블록을 통째로 삭제한다.
-# 그때까지는 구 버전 프론트가 계속 동작하도록 남겨둔다.
+# ── 관리자 전용 ────────────────────────────────────────────────
 
-@router.get("/projects/{project_id}", response_model=ProjectOut)
-async def get_project(project_id: int, db: AsyncSession = Depends(get_db)):
-    return await _by_id(db, project_id)
+@router.delete("/admin/projects/{project_id}", status_code=204)
+async def purge_project(
+    project_id: int,
+    x_admin_token: str | None = Header(default=None),
+    db: AsyncSession = Depends(get_db),
+):
+    """프로젝트와 딸린 데이터를 실제로 지운다(복구 불가).
 
+    사용자 삭제는 소프트 삭제뿐이다. 되돌릴 수 없는 파괴는 링크 소지자가
+    아니라 운영자만 할 수 있어야 하므로 ADMIN_TOKEN 뒤에 둔다.
+    미설정이면 열지 않는다(fail closed).
+    """
+    if not settings.admin_token or x_admin_token != settings.admin_token:
+        raise HTTPException(status_code=403, detail="관리자 토큰이 필요합니다.")
 
-@router.get("/projects/{project_id}/questions", response_model=list[QuestionOut])
-async def list_questions(project_id: int, db: AsyncSession = Depends(get_db)):
-    return await _active_questions(db, await _by_id(db, project_id))
+    project = await db.get(MonitorProject, project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail=_NOT_FOUND)
 
+    # ORM 캐스케이드는 관계를 적재해야 동작해 async에서 지연로딩 오류가 난다.
+    # 자식부터 순서대로 명시 삭제한다.
+    question_ids = select(MonitorQuestion.id).where(MonitorQuestion.project_id == project_id)
+    run_ids = select(MonitorRun.id).where(MonitorRun.question_id.in_(question_ids))
 
-@router.post("/projects/{project_id}/questions", response_model=QuestionOut, status_code=201)
-async def add_question(project_id: int, body: QuestionCreate, db: AsyncSession = Depends(get_db)):
-    return await _create_question(db, await _by_id(db, project_id), body.question)
-
-
-@router.delete("/projects/{project_id}/questions/{question_id}", status_code=204)
-async def deactivate_question(project_id: int, question_id: int, db: AsyncSession = Depends(get_db)):
-    await _retire_question(db, await _by_id(db, project_id), question_id)
-
-
-@router.delete("/projects/{project_id}", status_code=204)
-async def delete_project(project_id: int, db: AsyncSession = Depends(get_db)):
-    await _retire_project(db, await _by_id(db, project_id))
-
-
-@router.post("/projects/{project_id}/run", response_model=list[RunSummary])
-async def run_monitor(project_id: int, db: AsyncSession = Depends(get_db)):
-    return await _run(db, await _by_id(db, project_id))
-
-
-@router.get("/projects/{project_id}/dashboard", response_model=Dashboard)
-async def get_dashboard(project_id: int, db: AsyncSession = Depends(get_db)):
-    return await _dashboard(db, await _by_id(db, project_id))
+    await db.execute(delete(MonitorMention).where(MonitorMention.run_id.in_(run_ids)))
+    await db.execute(delete(MonitorRun).where(MonitorRun.question_id.in_(question_ids)))
+    await db.execute(delete(MonitorQuestion).where(MonitorQuestion.project_id == project_id))
+    await db.execute(delete(MonitorProject).where(MonitorProject.id == project_id))
+    await db.commit()
