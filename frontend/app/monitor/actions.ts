@@ -7,6 +7,7 @@ import {
   runMonitor,
   deleteQuestion,
   deleteProject,
+  unsubscribe,
 } from "@/lib/monitor-api";
 import { rememberProjectToken } from "@/lib/project-cookie";
 
@@ -46,4 +47,8 @@ export async function deleteQuestionAction(token: string, questionId: number): P
 export async function deleteProjectAction(token: string): Promise<void> {
   await deleteProject(token);
   redirect("/monitor");
+}
+
+export async function unsubscribeAction(token: string): Promise<void> {
+  await unsubscribe(token);
 }

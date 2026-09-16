@@ -40,6 +40,14 @@ services:
       - key: XAI_API_KEY
         sync: false
 
+      # 주간 리포트 발송 (Resend). 비워두면 발송을 건너뜀
+      - key: RESEND_API_KEY
+        sync: false
+      - key: RESEND_FROM
+        sync: false
+      - key: PUBLIC_BASE_URL
+        sync: false
+
       # 진단 collector용 (없으면 해당 항목은 unknown 처리)
       - key: KAKAO_REST_KEY
         sync: false

@@ -1,0 +1,42 @@
+name: 주간 리포트 발송
+
+# 잠든 Render를 깨우면서 보호된 엔드포인트를 호출한다.
+# 데이터가 부족한 프로젝트는 서버가 알아서 건너뛰므로(skipped_no_data)
+# 여기서는 조건을 따지지 않는다.
+on:
+  schedule:
+    - cron: "0 0 * * 1" # 매주 월요일 00:00 UTC = 09:00 KST
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "6일 쿨다운 무시 (수동 테스트용)"
+        type: boolean
+        default: false
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 서버 깨우기
+        run: |
+          for i in $(seq 1 20); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 60 "${{ secrets.AIVIS_API_URL }}/health" || echo 000)
+            echo "시도 $i: HTTP $code"
+            [ "$code" = "200" ] && exit 0
+            sleep 15
+          done
+          echo "서버가 깨어나지 않았습니다"
+          exit 1
+
+      - name: 리포트 발송
+        run: |
+          url="${{ secrets.AIVIS_API_URL }}/monitor/reports/weekly"
+          if [ "${{ inputs.force }}" = "true" ]; then url="$url?force=1"; fi
+          body=$(mktemp)
+          code=$(curl -s -X POST --max-time 300 \
+            -H "X-Admin-Token: ${{ secrets.ADMIN_TOKEN }}" \
+            -o "$body" -w '%{http_code}' "$url")
+          echo "HTTP $code"
+          # 프로젝트별 결과가 곧 발송 이력이다 (Actions 로그 90일 보관).
+          cat "$body"
+          [ "$code" = "200" ]

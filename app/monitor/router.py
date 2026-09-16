@@ -20,6 +20,8 @@ from app.db import get_db
 from app.models.orm import MonitorMention, MonitorProject, MonitorQuestion, MonitorRun
 from app.monitor.ai_clients import ENGINES
 from app.monitor.extraction import matches_brand
+from app.monitor.mailer import MailNotConfigured, send_email
+from app.monitor.reports import build_weekly_report, render_html, render_subject
 from app.monitor.runner import RunSummary, execute_project
 
 router = APIRouter(prefix="/monitor", tags=["monitor"])
@@ -29,6 +31,10 @@ RUN_COOLDOWN = timedelta(minutes=10)
 
 # 배치 조회 1회에 허용할 토큰 수
 MAX_BATCH_TOKENS = 20
+
+# 같은 프로젝트에 이 기간 안에는 리포트를 다시 보내지 않는다.
+# 스케줄러와 외부 cron이 겹쳐 돌아도 두 번 가지 않게 하는 장치다.
+REPORT_COOLDOWN = timedelta(days=6)
 
 
 # ── Pydantic 스키마 ────────────────────────────────────────────
@@ -511,3 +517,104 @@ async def purge_project(
     await db.execute(delete(MonitorQuestion).where(MonitorQuestion.project_id == project_id))
     await db.execute(delete(MonitorProject).where(MonitorProject.id == project_id))
     await db.commit()
+
+
+# ── 수신거부 ───────────────────────────────────────────────────
+
+@router.post("/p/{token}/unsubscribe", status_code=204)
+async def unsubscribe(token: str, db: AsyncSession = Depends(get_db)):
+    """주간 리포트 수신을 끈다.
+
+    owner_email을 지우지 않는다 — 동의 기록을 남겨둬야 하고, 나중에 다시 켤 수도 있다.
+    POST인 이유는 메일 클라이언트가 링크를 선제적으로 GET 하기 때문이다.
+    GET으로 두면 열어보지도 않은 사용자가 조용히 해지된다.
+    """
+    project = await _by_token(db, token)
+    project.report_opt_out = True
+    await db.commit()
+
+
+# ── 주간 리포트 발송 (관리자/크론 전용) ────────────────────────
+
+class ReportOutcome(BaseModel):
+    project: str
+    result: str          # sent | skipped_* | failed:<이유>
+
+
+@router.post("/reports/weekly", response_model=list[ReportOutcome])
+async def send_weekly_reports(
+    force: bool = False,
+    x_admin_token: str | None = Header(default=None),
+    db: AsyncSession = Depends(get_db),
+):
+    """수신 동의한 프로젝트에 주간 리포트를 보낸다.
+
+    프로젝트별 결과를 돌려주므로 호출한 크론의 실행 로그가 곧 발송 이력이 된다.
+    force=1은 쿨다운을 무시한다(수동 테스트용).
+    """
+    if not settings.admin_token or x_admin_token != settings.admin_token:
+        raise HTTPException(status_code=403, detail="관리자 토큰이 필요합니다.")
+
+    now = datetime.now(timezone.utc)
+    result = await db.execute(
+        select(MonitorProject).where(MonitorProject.deleted_at.is_(None))
+    )
+    projects = list(result.scalars().all())
+
+    outcomes: list[ReportOutcome] = []
+    for project in projects:
+        if not project.owner_email:
+            outcomes.append(ReportOutcome(project=project.name, result="skipped_no_email"))
+            continue
+        if project.report_opt_out:
+            outcomes.append(ReportOutcome(project=project.name, result="skipped_opted_out"))
+            continue
+        if not force and project.report_sent_at is not None:
+            if now - project.report_sent_at < REPORT_COOLDOWN:
+                outcomes.append(ReportOutcome(project=project.name, result="skipped_recent"))
+                continue
+
+        runs = list((await db.execute(
+            select(MonitorRun)
+            .join(MonitorQuestion, MonitorRun.question_id == MonitorQuestion.id)
+            .where(MonitorQuestion.project_id == project.id)
+        )).scalars().all())
+
+        mentions_by_run: dict[int, list[MonitorMention]] = {}
+        if runs:
+            rows = (await db.execute(
+                select(MonitorMention).where(MonitorMention.run_id.in_([r.id for r in runs]))
+            )).scalars().all()
+            for m in rows:
+                mentions_by_run.setdefault(m.run_id, []).append(m)
+
+        report = build_weekly_report(
+            project, runs, mentions_by_run,
+            now=now, base_url=settings.public_base_url,
+        )
+        if report is None:
+            # 데이터가 없는 주에 "0%"를 보내면 브랜드가 사라진 것처럼 읽힌다.
+            # 침묵하고, 알아야 할 쪽은 이 응답을 읽는 우리다.
+            outcomes.append(ReportOutcome(project=project.name, result="skipped_no_data"))
+            continue
+
+        try:
+            await send_email(
+                to=project.owner_email,
+                subject=render_subject(report),
+                html_body=render_html(report),
+                unsubscribe_url=report.unsubscribe_url,
+            )
+        except MailNotConfigured:
+            outcomes.append(ReportOutcome(project=project.name, result="skipped_mail_not_configured"))
+            continue
+        except Exception as e:
+            # 보냈다고 기록하지 않는다. 다음 실행에서 자연히 재시도된다.
+            outcomes.append(ReportOutcome(project=project.name, result=f"failed:{str(e)[:120]}"))
+            continue
+
+        project.report_sent_at = now
+        outcomes.append(ReportOutcome(project=project.name, result="sent"))
+
+    await db.commit()
+    return outcomes

@@ -107,3 +107,9 @@ export async function deleteProject(token: string): Promise<void> {
   const res = await apiFetch(`/monitor/p/${token}`, { method: "DELETE" });
   if (!res.ok) throw new Error(await readError(res));
 }
+
+/** 주간 리포트 수신을 끈다. */
+export async function unsubscribe(token: string): Promise<void> {
+  const res = await apiFetch(`/monitor/p/${token}/unsubscribe`, { method: "POST" });
+  if (!res.ok) throw new Error(await readError(res));
+}

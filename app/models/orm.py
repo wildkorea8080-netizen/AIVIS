@@ -63,6 +63,12 @@ class MonitorProject(Base):
     # 사용자 삭제는 행을 지우지 않고 이 값만 채운다.
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
+    # 주간 리포트 발송 시각. 실제로 전송에 성공한 뒤에만 채운다 —
+    # 시도 시점에 기록하면 실패한 발송이 다음 주까지 재시도되지 않는다.
+    report_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # 수신거부. owner_email을 지우지 않는 이유는 동의 기록을 남겨두기 위함이다.
+    report_opt_out: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+
     questions: Mapped[list["MonitorQuestion"]] = relationship(back_populates="project", cascade="all, delete-orphan")
 
 
