@@ -31,18 +31,19 @@ export default function MentionHeatmap({ rows, engines }: Props) {
     <div className="space-y-6 overflow-x-auto">
       {rows.map((row) => {
         // 날짜 × 모델 매핑
-        const grid: Record<string, Record<string, boolean | null>> = {};
+        const grid: Record<string, Record<string, boolean | null | "error">> = {};
         for (const date of allDates) {
           grid[date] = {};
           for (const m of AI_MODELS) grid[date][m] = null;
         }
         for (const run of row.runs) {
           const date = run.ran_at.slice(0, 10);
-          if (grid[date]) grid[date][run.ai_model] = run.mentioned;
+          if (grid[date]) grid[date][run.ai_model] = run.error ? "error" : run.mentioned;
         }
 
-        const mentionCount = row.runs.filter((r) => r.mentioned).length;
-        const total = row.runs.length;
+        const okRuns = row.runs.filter((r) => !r.error);   // 실패는 비율에서 제외
+        const mentionCount = okRuns.filter((r) => r.mentioned).length;
+        const total = okRuns.length;
 
         return (
           <div key={row.question_id} className="space-y-2">
@@ -73,10 +74,14 @@ export default function MentionHeatmap({ rows, engines }: Props) {
                       return (
                         <div
                           key={m}
-                          title={`${date} ${MODEL_LABEL[m]}: ${val === null ? "미실행" : val ? "언급됨" : "미언급"}`}
+                          title={`${date} ${MODEL_LABEL[m]}: ${
+                            val === null ? "미실행" : val === "error" ? "호출 실패" : val ? "언급됨" : "미언급"
+                          }`}
                           className={`w-6 h-6 rounded-sm transition-all ${
                             val === null
                               ? "bg-slate-800"
+                              : val === "error"
+                              ? "bg-red-900/70"
                               : val
                               ? "bg-green-500 shadow-sm shadow-green-500/30"
                               : "bg-slate-700"

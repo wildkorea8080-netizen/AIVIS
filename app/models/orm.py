@@ -94,6 +94,10 @@ class MonitorRun(Base):
     response_text: Mapped[str | None] = mapped_column(Text)     # 응답 전문 — 추출 로직을 고쳐도 재호출 없이 재추출 가능
     rank: Mapped[int | None] = mapped_column(Integer)       # 몇 번째로 언급됐는지
 
+    # 호출 실패 사유. 값이 있으면 이 행은 '실패 기록'이며 언급률 계산에서 제외된다.
+    # 실패를 아예 남기지 않으면 화면에서 '미실행'과 구분할 수 없다.
+    error: Mapped[str | None] = mapped_column(Text)
+
     ran_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, index=True)
 
     question: Mapped["MonitorQuestion"] = relationship(back_populates="runs")

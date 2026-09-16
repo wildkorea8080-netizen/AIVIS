@@ -11,11 +11,12 @@ const MODEL_COLOR: Record<string, string> = {
 };
 const FALLBACK_COLOR = "#64748b";
 
-type EngineState = "unconfigured" | "not-run" | "measured";
+type EngineState = "unconfigured" | "failed" | "not-run" | "measured";
 
 function stateOf(s: ModelStat): EngineState {
   if (!s.configured) return "unconfigured";
-  if (s.total_runs === 0) return "not-run";
+  // 호출했는데 성공이 하나도 없으면 '미실행'이 아니라 '실패'다.
+  if (s.total_runs === 0) return s.failed_runs > 0 ? "failed" : "not-run";
   return "measured";
 }
 
@@ -122,6 +123,17 @@ export default function ModelRadar({ stats }: { stats: ModelStat[] }) {
           {stats.map((s) => (
             <EngineRow key={s.ai_model} stat={s} />
           ))}
+          {stats.some((s) => stateOf(s) === "failed") && (
+            <div className="pt-2 space-y-1">
+              {stats
+                .filter((s) => stateOf(s) === "failed")
+                .map((s) => (
+                  <p key={s.ai_model} className="text-red-400/80 text-xs leading-relaxed">
+                    {s.label} 호출 실패 — {s.last_error?.slice(0, 120) ?? "원인 미상"}
+                  </p>
+                ))}
+            </div>
+          )}
           <p className="text-slate-600 text-xs pt-2 leading-relaxed">
             점선 축은 아직 추적하지 않는 엔진입니다. API 키를 등록하면 자동으로 포함됩니다.
           </p>
@@ -158,6 +170,11 @@ function EngineRow({ stat }: { stat: ModelStat }) {
         )}
         {state === "not-run" && (
           <span className="text-amber-500/80 text-xs">미실행</span>
+        )}
+        {state === "failed" && (
+          <span className="text-red-400 text-xs" title={stat.last_error ?? undefined}>
+            실패
+          </span>
         )}
         {state === "measured" && (
           <span className="inline-flex items-baseline gap-1.5">

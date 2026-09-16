@@ -59,6 +59,14 @@ async def execute_project(db: AsyncSession, project: MonitorProject) -> list[Run
                 "모니터링 호출 실패 project=%d question=%d model=%s: %s",
                 project.id, question.id, engine_name, e,
             )
+            # 실패도 행으로 남긴다. 남기지 않으면 대시보드가 '미실행'으로 표시해
+            # 사용자가 왜 결과가 없는지 알 수 없다.
+            db.add(MonitorRun(
+                question_id=question.id,
+                ai_model=engine_name,
+                mentioned=False,
+                error=str(e)[:500],
+            ))
             return RunResult(ai_model=engine_name, mentioned=False, rank=None, snippet=None, error=str(e))
 
         run = MonitorRun(

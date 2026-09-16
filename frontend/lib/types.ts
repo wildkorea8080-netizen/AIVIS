@@ -84,6 +84,7 @@ export interface DashboardRun {
   mentioned: boolean;
   rank: number | null;
   ran_at: string;
+  error: string | null;   // 값이 있으면 호출 실패 기록
 }
 
 export interface BrandStat {
@@ -110,6 +111,8 @@ export interface ModelStat {
   mentioned_runs: number;
   rate: number;
   avg_rank: number | null;
+  failed_runs: number;
+  last_error: string | null;
 }
 
 export interface Dashboard {

@@ -110,10 +110,12 @@ class ModelStat(BaseModel):
     ai_model: str
     label: str
     configured: bool         # API 키 설정 여부 — false면 "미설정"이지 "0% 언급"이 아님
-    total_runs: int
+    total_runs: int          # 성공한 호출 수 (실패는 제외)
     mentioned_runs: int
     rate: float              # 언급률 (0.0~1.0)
     avg_rank: float | None   # 언급됐을 때 평균 추천 순위
+    failed_runs: int = 0     # 호출은 했으나 실패한 수
+    last_error: str | None = None   # 가장 최근 실패 사유
 
 
 class Dashboard(BaseModel):
@@ -171,6 +173,38 @@ def _aggregate_brands(mentions: list[MonitorMention], brand_keyword: str) -> lis
         ))
 
     stats.sort(key=lambda s: (-s.mentions, s.avg_rank if s.avg_rank is not None else 99.0))
+    return stats
+
+
+def model_stats(all_runs: list[MonitorRun]) -> list[ModelStat]:
+    """엔진별 집계. 등록된 모든 엔진을 반환해 차트 축을 고정한다.
+
+    실패한 호출(error가 있는 행)은 언급률 분모에서 제외한다. 포함하면 크레딧
+    소진이나 장애가 '0% 언급'으로 보여, 실제로 추천되지 않은 것과 구분되지 않는다.
+    """
+    stats: list[ModelStat] = []
+    for engine in ENGINES:
+        engine_runs = [r for r in all_runs if r.ai_model == engine.name]
+        ok = [r for r in engine_runs if r.error is None]
+        failed = [r for r in engine_runs if r.error is not None]
+        mentioned = [r for r in ok if r.mentioned]
+        ranks = [r.rank for r in mentioned if r.rank is not None]
+
+        last_error = None
+        if failed:
+            last_error = max(failed, key=lambda r: r.ran_at).error
+
+        stats.append(ModelStat(
+            ai_model=engine.name,
+            label=engine.label,
+            configured=engine.has_key(),
+            total_runs=len(ok),
+            mentioned_runs=len(mentioned),
+            rate=len(mentioned) / len(ok) if ok else 0.0,
+            avg_rank=round(sum(ranks) / len(ranks), 1) if ranks else None,
+            failed_runs=len(failed),
+            last_error=last_error,
+        ))
     return stats
 
 
@@ -298,7 +332,8 @@ async def _dashboard(db: AsyncSession, project: MonitorProject) -> Dashboard:
     rows: list[DashboardRow] = []
     for q in questions:
         runs = runs_by_question.get(q.id, [])
-        mentioned_count = sum(1 for r in runs if r.mentioned)
+        ok_runs = [r for r in runs if r.error is None]   # 실패는 언급률 분모에서 제외
+        mentioned_count = sum(1 for r in ok_runs if r.mentioned)
         rows.append(DashboardRow(
             question_id=q.id,
             question=q.question,
@@ -308,32 +343,19 @@ async def _dashboard(db: AsyncSession, project: MonitorProject) -> Dashboard:
                     "mentioned": r.mentioned,
                     "rank": r.rank,
                     "ran_at": r.ran_at.isoformat(),
+                    "error": r.error,
                 }
                 for r in runs
             ],
-            mention_rate=mentioned_count / len(runs) if runs else 0.0,
+            mention_rate=mentioned_count / len(ok_runs) if ok_runs else 0.0,
             competitors=_aggregate_brands(
                 mentions_by_question.get(q.id, []), project.brand_keyword
             ),
         ))
 
-    total_rate = sum(1 for r in all_runs if r.mentioned) / len(all_runs) if all_runs else 0.0
-
-    # 엔진별 집계 — 등록된 모든 엔진을 반환해 차트 축을 고정한다
-    by_model: list[ModelStat] = []
-    for engine in ENGINES:
-        engine_runs = [r for r in all_runs if r.ai_model == engine.name]
-        mentioned = [r for r in engine_runs if r.mentioned]
-        ranks = [r.rank for r in mentioned if r.rank is not None]
-        by_model.append(ModelStat(
-            ai_model=engine.name,
-            label=engine.label,
-            configured=engine.has_key(),
-            total_runs=len(engine_runs),
-            mentioned_runs=len(mentioned),
-            rate=len(mentioned) / len(engine_runs) if engine_runs else 0.0,
-            avg_rank=round(sum(ranks) / len(ranks), 1) if ranks else None,
-        ))
+    ok_all = [r for r in all_runs if r.error is None]
+    total_rate = sum(1 for r in ok_all if r.mentioned) / len(ok_all) if ok_all else 0.0
+    by_model = model_stats(all_runs)
 
     return Dashboard(
         project_id=project.id,
