@@ -251,6 +251,17 @@ async def _run(db: AsyncSession, project: MonitorProject) -> list[RunSummary]:
             status_code=400,
             detail="활성 질문이 없거나 사용 가능한 AI 엔진이 없습니다.",
         )
+
+    # 개별 엔진 실패는 RunResult.error로 흡수되므로 전부 실패해도 응답은 200이 된다.
+    # 그러면 호출부는 성공으로 알고 아무것도 저장되지 않은 채 조용히 넘어간다.
+    results = [r for s in summaries for r in s.results]
+    if results and all(r.error for r in results):
+        first = next(r.error for r in results if r.error)
+        raise HTTPException(
+            status_code=502,
+            detail=f"AI 엔진 호출이 모두 실패했습니다. {first[:200]}",
+        )
+
     return summaries
 
 
